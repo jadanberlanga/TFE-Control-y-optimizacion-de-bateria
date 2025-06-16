@@ -858,8 +858,31 @@ def gestionar_ficheros_temporales(carpeta_temporal, json_generales, json_detalle
 
 
 
-def modo_historico(parametros,plot=True, pausa_calc=True):
-    """doc de modo historico placehlder"""
+def modo_historico(parametros, plot=True, pausa_calc=True):
+    """
+    Modo "histórico", uno de los modos principales del código.
+
+    Este modo carga datos pasados y calcula curvas óptimas con batería iterando con distintos precios de mercado de baterias:
+    - Inicializa o crea los CSVs históricos (precio, demanda, solar, temperatura).
+    - Une los datos por hora/día en una estructura conjunta tipo df de pandas.
+    - Llama a la rutina de cálculo para aplicar el modelo de optimización sobre todos esos datos.
+    - Si `plot=True`, genera gráficos para visualizar los resultados generales y detalle.
+
+    Parámetros:
+    -----------
+    parametros : dict con el JSON de parámetros ya leído. Contiene todos los inputs y configuraciones necesarias.
+
+    plot : flag booleano para mostrar gráficos. Aqui si es muy necesario plotear, necesito la grafica que genera, es el resultado.
+
+    pausa_calc : un flag booleano relacionado con lo anterior. Pausa el script para poder ver bien la grafica. Como antes tambien, necesario para ver el resultado
+
+    Returns:
+    --------
+    - Un int número de días optimizados (longitud del resultado). Sirve para control externo, para ver cuantos calculos hice.
+    - La hora a la que acabe el calculo, para ver cuanto tiempo tardo en calcular real
+    """
+
+    # === INICIALIZACIÓN ===
 
     os.makedirs("DatosPython", exist_ok=True) #si no existe la crea
 
@@ -873,38 +896,63 @@ def modo_historico(parametros,plot=True, pausa_calc=True):
     ruta_temperaturas_historicos = inicializar_temperaturas_historicos(parametros)
     # print(ruta_temperaturas_historicos)
 
-    datos_historicos_emparejados = inicializar_vector_emparejados_historicos(parametros, ruta_consumos_historicos,
-                                                                             ruta_precios_historicos,
-                                                                             ruta_solar_historicos,
-                                                                             ruta_temperaturas_historicos)
+    datos_historicos_emparejados = inicializar_vector_emparejados_historicos(parametros, ruta_consumos_historicos,ruta_precios_historicos,ruta_solar_historicos,ruta_temperaturas_historicos)
     # print(datos_historicos_emparejados)
 
 
-    #--- CALCULO DE OPTIMIZACION PRINCIPAL ---
+
+    # === OPTIMIZACIÓN ===
     #longitud_resultado_historicos = 25 #para que no error pero no quiero calcular
     longitud_resultado_historicos = subrutina_mass_calc_optim(parametros,datos_historicos_emparejados)
-    #--- FIN DEL CALCULO, PRESENTO DATOS ---
 
 
-    # presento
+
+    # === PRESENTACIÓN ===
     opciones = parametros.get("opciones_calculo", {})
     json_generales = opciones.get("json_generales", "resultados_generales_panel.json")    # leer parametros → opciones_calculo → json_generales. Si falla, usar valor por defecto
     json_detalle = opciones.get("json_detalle", "resultados_detalle_panel.json")    # leer parametros → opciones_calculo → json_detalle. Si falla, usar valor por defecto
 
+    tiempo_fin_calculo = time.time() #antes de plotear que puede quedar ahi indefinido, considero el calculo acabado
     if plot:
-        presentar.leer_y_plot_json_resultados(parametros,ruta_json_general=json_generales, ruta_json_detalle=json_detalle)
-        presentar.plot_guia_compra_doble(ruta_json_general=json_generales, ruta_json_detalle=json_detalle)
+        presentar.leer_y_plot_json_resultados(parametros,ruta_json_general=json_generales, ruta_json_detalle=json_detalle,parar_calc=False)
+        presentar.plot_guia_compra_doble(ruta_json_general=json_generales, ruta_json_detalle=json_detalle,parar_calc=pausa_calc)
 
-    return longitud_resultado_historicos
+    return longitud_resultado_historicos, tiempo_fin_calculo
 
 
 
 def modo_diario(parametros,plot=True, pausa_calc=True):
-    """doc de modo diario placehlder"""
+    """
+    Modo "diario", uno de los modos principales del codigo.
+
+    Este modo predice los datos de mañana y calcula la cuva de demanda de la bateria optima para el dia:
+    - Leo datos históricos (consumo, precios, solar, temperaturas).
+    - Obtiene datos presentes (desde web) y futuros, marcando que datos son reales y cuales no pude obtener reales.
+    - Completa los datos rellenando los datos que marque como que no pude obtener usando IA. O un modelo matematico tipo ARIMA si no tengo modelo de IA.
+    - Calcula la demanda óptima de batería para mañana (ya habiendo seleccionado una capacidad fija)).
+    - Muestra por consola el coste eléctrico con y sin batería, y estima el ahorro.
+    - Guarda todos los vectores generados en un archivo `.txt` legible.
+    - Si `plot=True`, genera gráficos para visualizar el resultado.
+
+    Parámetros:
+    -----------
+    parametros : dict con el JSON de parámetros ya leído. Contiene todos los inputs y configuraciones necesarias.
+
+    plot : un flag booleanno para plotear la grafica al final. En modo continuo no necesito una salida "visual", pero ayuda para debug y validacion
+
+    pausa_calc : un flag booleano relacionado con lo anterior. Pausa el script para poder ver bien la grafica. Como antes tambien, util en debug
+
+    Returns:
+    --------
+    - Un int de longitud que no tiene mucho sentido aqui, pero retorno un int 1 para mantener el estandar con el modo historicos, para indicar que hice 1 calculo
+    - La hora a la que acabe el calculo, para ver cuanto tiempo tardo en calcular real
+    """
+
+    # === INICIALIZACIÓN ===
 
     os.makedirs("DatosPython", exist_ok=True) #si no existe la crea
 
-    # inicializo todos los datos de historicos
+    # === inicializo todos los datos de historicos ===
     ruta_consumos_historicos = inicializar_consumos_historicos(parametros)
     # print(ruta_consumos_historicos)
     ruta_precios_historicos = inicializar_precios_historicos(parametros)
@@ -914,10 +962,7 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
     ruta_temperaturas_historicos = inicializar_temperaturas_historicos(parametros)
     # print(ruta_temperaturas_historicos)
 
-    datos_historicos_emparejados = inicializar_vector_emparejados_historicos(parametros, ruta_consumos_historicos,
-                                                                             ruta_precios_historicos,
-                                                                             ruta_solar_historicos,
-                                                                             ruta_temperaturas_historicos)
+    datos_historicos_emparejados = inicializar_vector_emparejados_historicos(parametros, ruta_consumos_historicos,ruta_precios_historicos,ruta_solar_historicos,ruta_temperaturas_historicos)
     # print(datos_historicos_emparejados)
 
     # creo datos futuros y expando el df de datos historicos emparejados
@@ -933,26 +978,19 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
     # print("Última fecha en el DataFrame:", fecha_ultima_formateada)
     # print("Fecha de hoy:", hoy_formateada)
 
-    # inicializo todos los datos de presente
-    ruta_consumos_presente_datos, ruta_consumos_presente_fuente = inicializar_consumos_futuros(parametros, fecha_ultima,
-                                                                                               fecha_objetivo, formato)
+
+
+    # === inicializo todos los datos de presente ===
+    ruta_consumos_presente_datos, ruta_consumos_presente_fuente = inicializar_consumos_futuros(parametros, fecha_ultima,fecha_objetivo, formato)
     # print(ruta_consumos_futuros)
-    ruta_precios_presente_datos, ruta_precios_presente_fuente = inicializar_precios_futuros(parametros, fecha_ultima,
-                                                                                            fecha_objetivo, formato)
+    ruta_precios_presente_datos, ruta_precios_presente_fuente = inicializar_precios_futuros(parametros, fecha_ultima,fecha_objetivo, formato)
     # print(ruta_precios_futuros)
-    ruta_irradancias_presente_datos, ruta_irradancias_presente_fuente = inicializar_irradiancias_futuros(parametros,
-                                                                                                         fecha_ultima,
-                                                                                                         fecha_objetivo,
-                                                                                                         formato)
+    ruta_irradancias_presente_datos, ruta_irradancias_presente_fuente = inicializar_irradiancias_futuros(parametros,fecha_ultima,fecha_objetivo,formato)
     # print(ruta_solar_futuros)
-    ruta_temperaturas_presente_datos, ruta_temperaturas_presente_fuente = inicializar_temperaturas_futuros(parametros,
-                                                                                                           fecha_ultima,
-                                                                                                           fecha_objetivo,
-                                                                                                           formato)
+    ruta_temperaturas_presente_datos, ruta_temperaturas_presente_fuente = inicializar_temperaturas_futuros(parametros,fecha_ultima,fecha_objetivo,formato)
     # print(ruta_temperaturas_futuros)
 
-    datos_futuros_emparejados, fuentes_futuras_emparejadas = inicializar_vector_emparejados_futuros(parametros,
-                                                                                                    fecha_objetivo, formato,
+    datos_futuros_emparejados, fuentes_futuras_emparejadas = inicializar_vector_emparejados_futuros(parametros,fecha_objetivo, formato,
                                                                                                     ruta_consumos_presente_datos,
                                                                                                     ruta_consumos_presente_fuente,
                                                                                                     ruta_precios_presente_datos,
@@ -962,20 +1000,24 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
                                                                                                     ruta_temperaturas_presente_datos,
                                                                                                     ruta_temperaturas_presente_fuente)
 
-    datos_combinados_emparejados = combinar_historicos_y_presentes(datos_historicos_emparejados,
-                                                                   datos_futuros_emparejados)
-    fuentes_combinadas_emparejadas = combinar_historicos_y_presentes(datos_historicos_emparejados,
-                                                                     fuentes_futuras_emparejadas)
+    datos_combinados_emparejados = combinar_historicos_y_presentes(datos_historicos_emparejados,datos_futuros_emparejados)
+    fuentes_combinadas_emparejadas = combinar_historicos_y_presentes(datos_historicos_emparejados,fuentes_futuras_emparejadas)
 
+
+
+    # === relleno huecos con IA. O modelo ARIMA si no tengo modelos ===
     # ya tengo los vectores generados y emparejados. Ahora falta completarlos con la IA
-    datos_combinados_IA, fuentes_combinados_IA = moduloIA.completar_datos(parametros, datos_combinados_emparejados,
-                                                                          fuentes_combinadas_emparejadas)
+    datos_combinados_IA, fuentes_combinados_IA = moduloIA.completar_datos(parametros, datos_combinados_emparejados,fuentes_combinadas_emparejadas)
     # print(datos_combinados_IA)
     # print(fuentes_combinados_IA)
 
+
+
+    # === CALCULO PRINCIPAL ===
+
+    # === obtencion de la capacidad de la bateria ===
     #antes del calculo obtengo la capacidad de bateria que vamos a usar al final, es una parametro.
-    #primero que existan. Luego que sean numeros
-    #Luego  la bateria espero que sea mayoy igual que 0,
+    #primero que existan. Luego que sean numeros. Luego la bateria espero que sea mayoy igual que 0,
     #el porcentaje espero que sea en forma decimal, es decir de 0 a 1, si no tiene sentido entonces da error. Si esta entre 1 y 100 tiro un warning y asumo lo metio en %, div entre 100
     try:
         capacidad_elegida_tot = parametros["bateria_elegida"]["capacidad_elegida_tot_kwh"]
@@ -1004,12 +1046,16 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
         raise ValueError(
             f"Falta la clave esperada en los parámetros: {e}. Asegúrate de que 'bateria_elegida' contenga 'capacidad_elegida_tot' y 'porcentale_decimal_usable'.")
 
-    # --- CALCULO DE OPTIMIZACION DE MANNANA ---
+
+
+    # === calculo de la optimizacion del ciclo de la bateria de mannana ===
     capacidad_usable = capacidad_elegida_tot*porcentale_decimal_usable
     dic_tot,dic_mannana = subrutina_futuro_calc_optim(parametros, datos_combinados_IA, capacidad_bat=capacidad_usable)
     #print(dicc_fut)
-    # --- FIN DEL CALCULO, PRESENTO DATOS ---
 
+
+
+    # === PRESENTACIÓN ===
     # Extraemos vectores
     precio_mannana = dic_mannana["precio"]
     demanda_bateria_mannana = dic_mannana["demanda_bateria"]
@@ -1056,6 +1102,7 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
 
 
     #Y si quiero ver datos puedo plotearlos
+    tiempo_fin_calculo = time.time() #antes de plotear que puede quedar ahi indefinido, considero el calculo acabado
     if plot:
         presentar.plot_multiples(dic_mannana["precio"], dic_mannana["demanda_casa"], dic_mannana["demanda_bateria"], dic_mannana["energia_bateria"], dic_mannana["precio_kwh_tipo"], fecha_inicio=None,formato_fecha="%d-%m-%y", parar_calc=False)
         presentar.plot_multiples(dic_tot["precio"], dic_tot["demanda_casa"], dic_tot["demanda_bateria"], dic_tot["energia_bateria"], dic_tot["precio_kwh_tipo"], fecha_inicio=None, formato_fecha="%d-%m-%y", parar_calc=pausa_calc)
@@ -1063,7 +1110,7 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
 
     longitud_resultado_futuro = 1 #solo ha sido 1 calculo en realidad. Uno largo, pero uno. Por estandarizar el output
 
-    return longitud_resultado_futuro
+    return longitud_resultado_futuro, tiempo_fin_calculo
 
 
 
@@ -1072,6 +1119,15 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
 
 
 def main():
+    """
+    Main del codigo.
+
+    Tiene un argparse, que permite ejecutar el codigo en 2 modos
+    - "historico"'": lee solo los historicos y saca la capacidad optima para esos datos, iterando y optimizando para varios precios de mercado.
+    - "diario": lee historicos, precios hasta hoy, y predice con ia/modelo clasico los datos futuros. Solo hace una optimizacion a datos fijos, la de mañana y la devuelve.
+
+    Como bonus calculo el tiempo que tardo, por curiosidad y medir grado de optimizacion del codigo.
+    """
     # para ver cuanto tarde, empiezo a contar al inicio
     tiempo_inicio_total = time.time()
 
@@ -1089,16 +1145,17 @@ def main():
         parametros = json.load(f)
 
     if args.modo == "historico":
-        cuenta = modo_historico(parametros, plot=True)
+        cuenta,tiempo_fin_calculo = modo_historico(parametros, plot=True)
     else:
-        cuenta = modo_diario(parametros, plot=True)
+        cuenta,tiempo_fin_calculo = modo_diario(parametros, plot=True)
 
     # tecnicamente aun hay una linea mas pero este es un buen punto para considerar el calculo finalizado.
     # lo que sigue es presentar (plot) los datos, puedo analizar los resultados obtenidos "sin prisa", no contaran al tiempo
     tiempo_fin_total = time.time()
+    tiempo_calculo = tiempo_fin_calculo - tiempo_inicio_total
     tiempo_total = tiempo_fin_total - tiempo_inicio_total
 
-    print(f"\n🔔 Terminó modo «{args.modo}» en {tiempo_total:.2f}s → {cuenta} cálculos realizados.")
+    print(f"\n🔔 Terminó modo «{args.modo}» en {tiempo_total:.2f}s en total → {cuenta} cálculos realizados en {tiempo_calculo:.2f}s.")
     # print(f"\n\nTiempo total: {tiempo_total:.2f}s ({(tiempo_total/60):.2f}m). Numero calculos: {longitud_resultado_historicos:.2f} -> Tiempo medio por calculo: {(tiempo_total / longitud_resultado_historicos):.2f}")
 
     return

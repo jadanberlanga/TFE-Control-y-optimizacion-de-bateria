@@ -383,7 +383,7 @@ def plot_guia_compra_simple(vector_precios,vector_capacidad):
     plt.legend()
     plt.show()
 
-def plot_guia_compra_doble(vector_precios_general=None, vector_capacidad_general=None,vector_precios_detalle=None, vector_capacidad_detalle=None,ruta_json_general=None, ruta_json_detalle=None):
+def plot_guia_compra_doble(vector_precios_general=None, vector_capacidad_general=None,vector_precios_detalle=None, vector_capacidad_detalle=None,ruta_json_general=None, ruta_json_detalle=None,parar_calc=False):
     # leo el json si se pasan rutas, si no uso los vectores que le doy
     if ruta_json_general:
         with open(ruta_json_general, 'r') as f:
@@ -452,7 +452,7 @@ def plot_guia_compra_doble(vector_precios_general=None, vector_capacidad_general
     ax2.legend(loc="upper right")
 
     plt.tight_layout()
-    plt.show()
+    plt.show(block=parar_calc)
 
 
 
@@ -589,7 +589,7 @@ def guardar_json_resultados(ruta_json,ruta_db,clave_precio,diccionario_resultado
 
     return
 
-def leer_y_plot_json_resultados(parametros,ruta_json_detalle="resultados_detalle_panel.json",ruta_json_general="resultados_generales_panel.json"):
+def leer_y_plot_json_resultados(parametros,ruta_json_detalle="resultados_detalle_panel.json",ruta_json_general="resultados_generales_panel.json",parar_calc=False):
     '''Le voy a pasar un rango de precios a leer de los json. Luego los ploteare'''
 
     '''
@@ -648,7 +648,7 @@ def leer_y_plot_json_resultados(parametros,ruta_json_detalle="resultados_detalle
             print(f"❌ No se encontró ningún dato ni siquiera aproximado para: {valor_original}")
             continue
 
-        plot_multiples(np.array(datos["Precio"]), np.array(datos["Demanda Casa"]), np.array(datos["Vector Demanda Bateria"]), np.array(datos["Vector Energia Bateria"]), datos["Precio kWh"], parar_calc=False)
+        plot_multiples(np.array(datos["Precio"]), np.array(datos["Demanda Casa"]), np.array(datos["Vector Demanda Bateria"]), np.array(datos["Vector Energia Bateria"]), datos["Precio kWh"], parar_calc=parar_calc)
 
 
 
