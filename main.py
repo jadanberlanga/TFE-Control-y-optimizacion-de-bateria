@@ -577,10 +577,24 @@ def inicializar_vector_emparejados_futuros(parametros, fecha_fin_input, formato_
     return datos_emparejados, fuentes_emparejadas
 
 def combinar_historicos_y_presentes(datos_historicos_emparejados,datos_futuros_emparejados):
+    """
+    \nCombina datos históricos y futuros de manera continua, asegurando coherencia temporal y sin duplicados.
+Se ajusta la columna 'Dia_int' de los datos futuros para continuar tras los históricos correctamente, sin interrupciones (huecos) ni duplicados.
+Se asegura la misma estructura de del df y se eliminan duplicados basados en el dia (dejando los históricos y borrando los futuros).
+
+    \nParámetros:
+    \n- datos_historicos_emparejados : pd.DataFrame, conjunto de datos históricos ya emparejados, con las columnas de 'DATE', 'Hora_int', 'Dia_int', etc.
+    \n- datos_futuros_emparejados : pd.DataFrame conjunto de datos futuros a unir tras los históricos, con el mismo formato.
+
+    \nRetorna:
+    \n- datos_combinados : pd.DataFrame DataFrame resultante de la combinación, sin duplicados y ordenado cronológicamente. La columna 'Dia_int' es continua, y las horas faltantes (si las hay) y lo que se ha borrado (si se borra algo) se reportan por consola.
+    """
+
     # Paso 1: Asegurar mismas columnas y orden
     datos_futuros_emparejados = datos_futuros_emparejados[datos_historicos_emparejados.columns]
 
     """
+    #No hace falta este dato, ya son iguales
     # Paso 2: Asegurar tipos de datos iguales
     for col in datos_historicos_emparejados.columns:
         datos_futuros_emparejados[col] = datos_futuros_emparejados[col].astype(datos_historicos_emparejados[col].dtype)
@@ -631,13 +645,30 @@ def combinar_historicos_y_presentes(datos_historicos_emparejados,datos_futuros_e
 
 
 def subrutina_calculo_principal(datos,ruta_parametros,dias_seleccionados_ini,dias_seleccionados_fin,paso,rango_mult_ini=None,rango_mulf_fin=None, ini_concreto=None, fin_concreto=None,ruta_output_json="resultados.json",ruta_output_db=None,ruta_precalc=None,ruta_indexados=None,modo="Precio"):
-    '''tomo los datos inicizalizados y emparejados, acoto los datos  que quiero calcular y le paso todos los parametros necesarios para el calculo:
-    \nDatos: precios, demandas, solares, fechas. Lo necesario para el calculo
-    \nRuta del json de paremetros
-    \nDias a calcular
-    \nRangos de valores a calcular
-    \nRuta salida (donde dejar los datos obtenidos)
-    \nAuxiliares para y modo de calculo'''
+    """
+    \nEjecuta un cálculo de optimización del ciclo de demanda de la bateria (y la capacidad de esta si se pone en el modo correcto)
+para un conjunto de días seleccionados y un rango de precios definido.
+Filtra el DataFrame de entrada por días y llama al núcleo de cálculo (`problema_rango_precios`) para obtener resultados,
+guardándolos en formato JSON o en una base de datos shelve opcional.
+
+    \nParámetros:
+    \n- datos : pd.DataFrame, debe incluir la columna 'Dia_int' y las variables necesarias para el cálculo (precio, solar, demanda, etc.).
+    \n- ruta_parametros : str, ruta al JSON con parámetros de configuración de optimización.
+    \n- dias_seleccionados_ini / dias_seleccionados_fin : int, día inicial y final (índices tipo 1–365) para filtrar el cálculo.
+    \n- paso : float, resolución del muestreo de precios (€/kWh).
+    \n- rango_mult_ini / rango_mulf_fin : float, multiplicadores para definir un rango relativo sobre los precios (solo se usan si ini_concreto y fin_concreto son None).
+    \n- ini_concreto / fin_concreto : float, valores absolutos para el rango de precios (override sobre los multiplicadores).
+    \n- ruta_output_json : str, ruta del archivo .json donde guardar resultados (el anterior se borra si existe).
+    \n- ruta_output_db : str, ruta opcional de shelve.db donde guardar resultados incrementales (más eficiente en cálculo masivo).
+    \n- ruta_precalc : str, ruta opcional a resultados precalculados para evitar repetir cálculos.
+    \n- ruta_indexados : str, archivo auxiliar para registrar qué configuraciones ya se calcularon.
+    \n- modo : str, define el tipo de muestreo.
+    \t"Precio" por defecto, para hacer el precio de la bateria fijo y asi calcular ambos la capacidad optima para dicho precio y el ciclo que seguiria
+    \n\t"Capacidad" la otra opcion, para darle una capacidad de bateria ya fija y que solo optimice su ciclo
+
+    \nReturns:
+    \n- resultado : np.array, conjunto de capacidades de batería calculadas en esta ejecución (los ciclos los guardo en ficheros, no los retorno.
+    """
 
     #antes de calcular mejor me borro un posible archivo anterior, no quiero mezclar datos
     if os.path.exists(ruta_output_json):
@@ -652,7 +683,23 @@ def subrutina_calculo_principal(datos,ruta_parametros,dias_seleccionados_ini,dia
     return resultado
 
 def subrutina_mass_calc_optim(parametros_json,datos_historicos_emparejados,json_generales=None,json_detalle=None,paso_general=None,paso_detalle=None,rango_inicio_general=None,rango_fin_general=None,capacidad_min=None,capacidad_max=None):
-    '''tomare todos los parametros que le pase de pasos  camculare en bucle para distintos parametros el calculo de optimizacion principal'''
+    """
+    \nEjecuta un cálculo masivo de optimización energética para distintas condiciones, en dos fases:
+    1. Cálculo general (rango amplio de precios, paso grueso, me da una idea general de los resultados que obtendre).
+    2. Cálculo detallado (rango restringido a los valores mas utiles calculados en el general, paso fino).
+    \nUtiliza almacenamiento temporal con `shelve` para eficiencia, y permite sobreescribir opciones vía argumentos explícitos.
+
+    \nParámetros:
+    \n- parametros_json: dict de configuración global.
+    \n- datos_historicos_emparejados: DataFrame con datos de entrada (formato 24xN).
+    \n- json_generales/json_detalle: rutas a archivos .json para guardar resultados generales/detallados (generados luego de cerrar el shelve de database).
+    \n- paso_general/paso_detalle: resolución de muestreo para cada cálculo. El del detalle debe ser menor que el del general.
+    \n- rango_inicio_general/rango_fin_general: límites de precio elegidos arbitrariamente (algo con sentido) para el muestreo general.
+    \n- capacidad_min/capacidad_max: para filtrar qué resultados son mas físicamente viables.
+
+    \nRetorna:
+    \n- longitud_resultado: número total de simulaciones únicas realizadas.
+    """
 
     #los parametros si son None (no los pase) entonces leelos del json. SI no el parametro que pase a mano tiene proiridad. Tod0 eso va con comprehension, varias intrucc por linea
     opciones = parametros_json.get("opciones_calculo", {}) #si existe esa string en el json cargala, si no dejala vacia con {} (asi no da error de key error)
@@ -685,7 +732,7 @@ def subrutina_mass_calc_optim(parametros_json,datos_historicos_emparejados,json_
     margen = paso_detalle  # un poquito mas de margen que ese rango calculado
     ini_concreto = max(precio_min - margen, 0)  # Expande el rango hacia abajo. Y que no sea menor a 0
     fin_concreto = precio_max + margen  # Expande el rango hacia arriba
-    print(f"Rango de precios usables en la realidad: {precio_min} - {precio_max}")
+    print(f"[INFO] Rango de precios relevantes para instalación: {precio_min:.3f} - {precio_max:.3f} €/kWh (paso detalle = {paso_detalle})")
 
     # calculo detallado, paso mas pequeño, rango mas especifico
     resultado_detalle = subrutina_calculo_principal(datos_historicos_emparejados, parametros_json, 1, 365, paso_detalle,
@@ -706,6 +753,23 @@ def subrutina_mass_calc_optim(parametros_json,datos_historicos_emparejados,json_
 
 
 def subrutina_futuro_calc_optim(parametros_json,datos,capacidad_bat=0):
+    """
+    \nCalcula la optimización energética para un conjunto pequeño de días recientes (ayer, hoy, mañana, pasado mañana),
+centrado en extraer los resultados del día de mañana.Este script está diseñado para predicción a corto plazo,
+sin uso de archivos grandes ni bases de datos, no es necesario llamar a las funciones de shelve de db ni nada por el estilo.
+Se parte de un DataFrame con los datos necesarios y se llama directamente a la función principal de cálculo.
+
+    \nParámetros:
+    \n- parametros_json : dict, configuración de optimización.
+    \n- datos : pd.DataFrame, contiene al menos una columna 'DATE' y las variables horarias (precio, solar, demanda, etc.).
+    \n- capacidad_bat : float, capacidad fija de batería a usar en el cálculo (opcional, por defecto 0).
+        Es opcional solo por dejar opciones, no tiene sentido hacer el calculo siendo la bateria de capacidad 0.
+
+    \nReturns:
+    \n- dic_tot : dict, resultados completos del cálculo (varios días, por defecto 4, hoy, mañana, pasado mañana, pasado pasado mañana).
+    \n- dic_mannana : dict, resultados específicos del día de mañana (24 valores).
+    """
+
 
     #en esa var de datos me llegan mushos datos. Para el futuro dia a dia con los ultimos dias me vale, selecciono las fecahs que me interesan:
     # me aseguro que DATE esta en datetime
@@ -797,8 +861,26 @@ def subrutina_futuro_calc_optim(parametros_json,datos,capacidad_bat=0):
 
 
 def obtener_rango_precios(ruta_json, ruta_db_generales, capacidad_min, capacidad_max):
-    '''Primero resuelvo un rango muy amplio. El scrit saca una respuesta matematicamente correcta.
-    Pero solo tienen sentido un rango concreto de valores, obtengo dicho rango (para luego calcular este rango con mas detalle)'''
+    """
+    Extrae el rango de precios relevantes para una capacidad de batería determinada. Este paso sirve como filtro previo:
+    \n- A partir de un cálculo inicial sobre un rango amplio de precios (calculo general), se identifican los precios en los que la batería obtenida mas factible fisicamente y no solo una solucion matematicamente correcta.
+    \n- Luego, se acota ese rango para centrar el cálculo detallado solo en los valores que tienen sentido, calculando una densidad de puntos mayor en dicho rango.
+    \nSe puede leer tanto desde un archivo JSON como desde una base de datos `shelve` (más eficiente). Si se proporciona la base de datos, tiene prioridad.
+
+    \nParámetros:
+    \n- ruta_json : str, ruta al archivo `.json` con los resultados generales
+
+    \n- ruta_db_generales : str o None, ruta al archivo `.db` de `shelve` con resultados. Si es None, se usará el JSON.
+
+    \n- capacidad_min : float, capacidad mínima de batería que se quiere considerar válida
+
+    \n- capacidad_max : float, capacidad máxima de batería que se quiere considerar válida
+
+    \nReturns:
+    \n- precio_min : float o None, precio mínimo dentro del rango válido (o None si no hay datos)
+
+    \n- precio_max : float o None, precio máximo dentro del rango válido (o None si no hay datos)
+    """
 
     #puede buscar por database (shelve) o json. Db es mas eficiente, priorizo ese
     if ruta_db_generales is not None:
@@ -823,8 +905,31 @@ def obtener_rango_precios(ruta_json, ruta_db_generales, capacidad_min, capacidad
 
 
 def gestionar_ficheros_temporales(carpeta_temporal, json_generales, json_detalle, indexados_aux,fase):
-    '''Para mejorar el guardado de datos durante el calculo (se acaba generando un json relativamente pesado que necesita ser modificado repetidamente) uso una libreria de database simple (shelve).
-    Esta genera archivos temporales que no necesito luego. Los meto en una carpeta (una nueva) y borro al acabar'''
+    """
+    Utilidad para gestionar archivos temporales durante el cálculo con `shelve` (una database sencilla). Permite guardar resultados intermedios en disco de forma eficiente:
+    \n - Cuando `fase="open"`: esta en la fase de abrir y crear los archivos temporales. Crea la carpeta temporal y limpia residuos anteriores si existen.
+    \n - Cuando `fase="close"`: esta en la fase de cerrar y borrar los archivos temporales. Exporta los datos `.db` generados con `shelve` a JSON, y elimina la carpeta temporal.
+
+    \nSepara los archivos en dos JSON distintos (generales y detalle, estrucctura que uso para acelerar el calculo, un calculo geneneral y con ese busco que rango me interesa mas).
+    Luego pueden ser leidos y usados para plots u otras rutinas.
+
+    \nParámetros:
+    \n- carpeta_temporal : str, nombre o ruta de la carpeta donde meter los `.db` temporales
+
+    \n- json_generales : str, nombre del archivo de salida JSON con datos agregados del cálculo
+
+    \n- json_detalle : str, nombre del archivo de salida JSON con resultados por capacidad
+
+    \n- indexados_aux : str, nombre del archivo auxiliar para almacenar índices temporales
+        (para mejorar la eficiencia indexo lo que ya tengo calculado para no calcular 2 veces lo mismo en el sistema de 2 pasadas, general y detalle)
+
+    \n- fase : str, puede ser "open" o "close". Abre la carpeta y prepara limpieza, o exporta y cierra.
+
+    \nReturns:
+    \n- ruta_db_generales : str, ruta al archivo `.db` general dentro de la carpeta temporal
+    \n- ruta_db_detalle   : str, ruta al archivo `.db` de detalle dentro de la carpeta temporal
+    \n- ruta_indexados_aux: str, ruta al archivo auxiliar de índices
+    """
 
     #me preparo las rutas dentro de la carpeta temporal
     ruta_indexados_aux = os.path.join(carpeta_temporal, indexados_aux)
@@ -863,23 +968,21 @@ def modo_historico(parametros, plot=True, pausa_calc=True):
     Modo "histórico", uno de los modos principales del código.
 
     Este modo carga datos pasados y calcula curvas óptimas con batería iterando con distintos precios de mercado de baterias:
-    - Inicializa o crea los CSVs históricos (precio, demanda, solar, temperatura).
-    - Une los datos por hora/día en una estructura conjunta tipo df de pandas.
-    - Llama a la rutina de cálculo para aplicar el modelo de optimización sobre todos esos datos.
-    - Si `plot=True`, genera gráficos para visualizar los resultados generales y detalle.
+    \n- Inicializa o crea los CSVs históricos (precio, demanda, solar, temperatura).
+    \n- Une los datos por hora/día en una estructura conjunta tipo df de pandas.
+    \n- Llama a la rutina de cálculo para aplicar el modelo de optimización sobre todos esos datos.
+    \n- Si `plot=True`, genera gráficos para visualizar los resultados generales y detalle.
 
-    Parámetros:
-    -----------
-    parametros : dict con el JSON de parámetros ya leído. Contiene todos los inputs y configuraciones necesarias.
+    \nParámetros:
+    \n- parametros : dict con el JSON de parámetros ya leído. Contiene todos los inputs y configuraciones necesarias.
 
-    plot : flag booleano para mostrar gráficos. Aqui si es muy necesario plotear, necesito la grafica que genera, es el resultado.
+    \n- plot : flag booleano para mostrar gráficos. Aqui si es muy necesario plotear, necesito la grafica que genera, es el resultado.
 
-    pausa_calc : un flag booleano relacionado con lo anterior. Pausa el script para poder ver bien la grafica. Como antes tambien, necesario para ver el resultado
+    \n- pausa_calc : un flag booleano relacionado con lo anterior. Pausa el script para poder ver bien la grafica. Como antes tambien, necesario para ver el resultado
 
-    Returns:
-    --------
-    - Un int número de días optimizados (longitud del resultado). Sirve para control externo, para ver cuantos calculos hice.
-    - La hora a la que acabe el calculo, para ver cuanto tiempo tardo en calcular real
+    \nReturns:
+    \n- Un int número de días optimizados (longitud del resultado). Sirve para control externo, para ver cuantos calculos hice.
+    \n- La hora a la que acabe el calculo, para ver cuanto tiempo tardo en calcular real
     """
 
     # === INICIALIZACIÓN ===
@@ -926,26 +1029,24 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
     Modo "diario", uno de los modos principales del codigo.
 
     Este modo predice los datos de mañana y calcula la cuva de demanda de la bateria optima para el dia:
-    - Leo datos históricos (consumo, precios, solar, temperaturas).
-    - Obtiene datos presentes (desde web) y futuros, marcando que datos son reales y cuales no pude obtener reales.
-    - Completa los datos rellenando los datos que marque como que no pude obtener usando IA. O un modelo matematico tipo ARIMA si no tengo modelo de IA.
-    - Calcula la demanda óptima de batería para mañana (ya habiendo seleccionado una capacidad fija)).
-    - Muestra por consola el coste eléctrico con y sin batería, y estima el ahorro.
-    - Guarda todos los vectores generados en un archivo `.txt` legible.
-    - Si `plot=True`, genera gráficos para visualizar el resultado.
+    \n- Leo datos históricos (consumo, precios, solar, temperaturas).
+    \n- Obtiene datos presentes (desde web) y futuros, marcando que datos son reales y cuales no pude obtener reales.
+    \n- Completa los datos rellenando los datos que marque como que no pude obtener usando IA. O un modelo matematico tipo ARIMA si no tengo modelo de IA.
+    \n- Calcula la demanda óptima de batería para mañana (ya habiendo seleccionado una capacidad fija)).
+    \n- Muestra por consola el coste eléctrico con y sin batería, y estima el ahorro.
+    \n- Guarda todos los vectores generados en un archivo `.txt` legible.
+    \n- Si `plot=True`, genera gráficos para visualizar el resultado.
 
-    Parámetros:
-    -----------
-    parametros : dict con el JSON de parámetros ya leído. Contiene todos los inputs y configuraciones necesarias.
+    \nParámetros:
+    \n- parametros : dict con el JSON de parámetros ya leído. Contiene todos los inputs y configuraciones necesarias.
 
-    plot : un flag booleanno para plotear la grafica al final. En modo continuo no necesito una salida "visual", pero ayuda para debug y validacion
+    \n- plot : un flag booleanno para plotear la grafica al final. En modo continuo no necesito una salida "visual", pero ayuda para debug y validacion
 
-    pausa_calc : un flag booleano relacionado con lo anterior. Pausa el script para poder ver bien la grafica. Como antes tambien, util en debug
+    \n- pausa_calc : un flag booleano relacionado con lo anterior. Pausa el script para poder ver bien la grafica. Como antes tambien, util en debug
 
-    Returns:
-    --------
-    - Un int de longitud que no tiene mucho sentido aqui, pero retorno un int 1 para mantener el estandar con el modo historicos, para indicar que hice 1 calculo
-    - La hora a la que acabe el calculo, para ver cuanto tiempo tardo en calcular real
+    \nReturns:
+    \n- Un int de longitud que no tiene mucho sentido aqui, pero retorno un int 1 para mantener el estandar con el modo historicos, para indicar que hice 1 calculo
+    \n- La hora a la que acabe el calculo, para ver cuanto tiempo tardo en calcular real
     """
 
     # === INICIALIZACIÓN ===
