@@ -368,9 +368,9 @@ def emparejar_datos_historicos(fecha_ini=None, fecha_fin=None, format=None, ruta
 
     #si alguno no esta mejor los cargo todos de vuelta
     if fecha_ini is None or fecha_fin is None or format is None:
-        fecha_ini = parametros_json["rango_historicos"]["fecha_ini"]
-        fecha_fin = parametros_json["rango_historicos"]["fecha_fin"]
-        format = parametros_json["rango_historicos"]["formato"]
+        fecha_ini = parametros_json["rango_historicos_set_1"]["fecha_ini"]
+        fecha_fin = parametros_json["rango_historicos_set_1"]["fecha_fin"]
+        format = parametros_json["rango_historicos_set_1"]["formato"]
 
     #print(fecha_ini,fecha_fin)
 
@@ -405,9 +405,9 @@ def emparejar_datos_futuros(fecha_ini=None, fecha_fin=None, format=None, ruta_da
     """
     #si alguno no esta mejor los cargo todos de vuelta
     if fecha_ini is None or fecha_fin is None or format is None:
-        fecha_ini = parametros_json["rango_historicos"]["fecha_ini"]
-        fecha_fin = parametros_json["rango_historicos"]["fecha_fin"]
-        format = parametros_json["rango_historicos"]["formato"]
+        fecha_ini = parametros_json["rango_historicos_set_1"]["fecha_ini"]
+        fecha_fin = parametros_json["rango_historicos_set_1"]["fecha_fin"]
+        format = parametros_json["rango_historicos_set_1"]["formato"]
     """
 
     #print(fecha_ini,fecha_fin)

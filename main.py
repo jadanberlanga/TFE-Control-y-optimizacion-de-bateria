@@ -20,17 +20,21 @@ import os, re, json, time, shelve, shutil, argparse, requests
 #pip install OMIEData
 
 
-'la idea es primero datos de endesa, el doc entero lo leo, lo proceso y lo guardo, con todas las fechas'
-'siguiente es omie. Si tengo los datos de todas las fechas del doc de endesa raw puta madre, apañao. Si no scrap'
-'siguiente es empareajr segun las fechas que le di'
-'le paso esos datos a calcular la wea. Hago 2, un calculo general, con pasos grandes, otro con pasos finos con zoom'
-'ploteo las graficas, ambas general y con detalle. Y la guardo?'
-'sistema de pedir un input para plt masivo?'
 
 def inicializar_consumos_historicos(parametros):
-    ''' CALCULO CON HISTORICOS DE EDISTRIBUCION https://zonaprivada.edistribucion.com/areaprivada/
-    \nVoy a ver si tengo un archivo con los consumos ya procesado. Si no preparo uno nuevo. De momento solo inicializo,
-con tener localizado la ruta de un archivo con datos de consumo es suficiente '''
+    """
+    \nInicializa los datos históricos de consumo eléctrico (Edistribución), buscando archivos ya existentes o creándolos a partir de un archivo CSV de entrada si no se encuentran.
+En caso de no haber archivo procesado disponible, se escanea la carpeta de entrada y se toma el primer CSV encontrado como fuente original de datos.
+El archivo resultante será usado como referencia principal para determinar el rango temporal del resto de variables (irradiancia, temperatura, precios...).
+\n Puedo obtener un fichero con los datos desde la web de edistribucion, con el servicio de descarga masiva de curvas https://zonaprivada.edistribucion.com/areaprivada/
+
+
+    \nParámetros:
+    \n- parametros : dict, JSON ya cargado con información de configuración general.
+
+    \nReturns:
+    \n- ruta_consumos : str, ruta al archivo CSV con los datos de consumo horario ya procesados.
+    """
 
     carpeta = "DatosPython"  # carpeta donde están los archivos donde buscara el patron
     patron = r"Datos_Edistribucion_(\d{2}-\d{2}-\d{4})_a_(\d{2}-\d{2}-\d{4})\.csv" #regex
@@ -44,7 +48,7 @@ con tener localizado la ruta de un archivo con datos de consumo es suficiente ''
         print("No hay un archivo con el rango de fechas de consumo necesarias, creando uno nuevo...")
 
         """
-        ruta_archivo_input = parametros["rango_historicos"]["ruta_datos_edistribucion"]
+        ruta_archivo_input = parametros["rango_historicos_set_1"]["ruta_datos_edistribucion"]
         nombre_archivo_output_base = "Datos_Edistribucion.csv" #forma (base) que darle. Luego le adjunto fechas
 
         #llamo a las funciones para procesar los datos de edistribucion
@@ -71,8 +75,21 @@ con tener localizado la ruta de un archivo con datos de consumo es suficiente ''
     return ruta_consumos
 
 def inicializar_consumos_futuros(parametros,fecha_ini,fecha_fin,formato):
-    '''Pora el caso del consumo no tiene muho sentido este paso, pero por simetria dara crear un dataframe unificado, completo con ia los datos desde el ultimo valor hasta el presente'''
+    """
+    \nInicializa los datos de consumo eléctrico futuros (Edistribución), generando archivos vacíos o completados parcialmente si es necesario.
+Aunque en la práctica no se pueden obtener datos reales futuros de consumo, esta función existe por simetría con el resto del sistema.
+Genera un archivo de datos con valores reales o pendientes, y su correspondiente archivo gemelo que marca qué datos son reales y cuáles deberán ser completados por IA.
 
+    \nParámetros:
+    \n- parametros : dict, JSON de configuración ya cargado.
+    \n- fecha_ini : datetime, fecha inicial del rango a completar.
+    \n- fecha_fin : datetime, fecha final del rango a completar.
+    \n- formato : str, formato de las fechas (de normal "%d-%m-%Y").
+
+    \nReturns:
+    \n- ruta_consumos_presente_datos : str, ruta al CSV que contiene los valores de consumo (con ceros en caso de valores futuros pendientes).
+    \n- ruta_consumos_presente_fuente : str, ruta al CSV paralelo que indica qué valores son reales y cuáles deben ser completados por IA u otro mét0do.
+    """
     carpeta = "DatosPython"  # carpeta donde están los archivos donde buscara el patron
     nombre_archivo_output_base_presente_datos = "Datos_Edistribucion_Futuro.csv"  # forma que darle
     nombre_archivo_output_base_presente_fuente = "Datos_Edistribucion_FuturFuente.csv"  # forma que darle
@@ -94,9 +111,17 @@ def inicializar_consumos_futuros(parametros,fecha_ini,fecha_fin,formato):
 
 
 def inicializar_precios_historicos(parametros):
-    '''SCRAP A OMIE CON UN SCRIPT DE GIT https://github.com/acruzgarcia/OMIEData
-    \nVoy a ver si tengo un archivo con los precios ya procesado. Si no preparo uno nuevo. De momento solo inicializo,
-con tener localizado la ruta de un archivo con datos de precios es suficiente '''
+    """
+    \nInicializa los datos de precios eléctricos históricos (OMIE), localizando archivos existentes o generándolos si no se encuentran.
+Si no existe ningún archivo que cubra el rango necesario, se extraen los datos mediante un scraper basado en:
+https://github.com/acruzgarcia/OMIEData. Como referencia para el rango temporal, se utilizan las fechas del archivo de consumo de Edistribución.
+
+    \nParámetros:
+    \n- parametros : dict, JSON ya cargado con información de configuración (zonas, fechas, etc.).
+
+    \nReturns:
+    \n- ruta_precios : str, ruta al archivo CSV que contiene los datos de precios históricos del mercado eléctrico OMIE.
+    """
 
     carpeta = "DatosPython"  # carpeta donde están los archivos donde buscara el patron
     patron = r"Datos_Omie_(\d{2}-\d{2}-\d{4})_a_(\d{2}-\d{2}-\d{4})\.csv" #regex
@@ -143,11 +168,21 @@ con tener localizado la ruta de un archivo con datos de precios es suficiente ''
     return ruta_precios
 
 def inicializar_precios_futuros(parametros,fecha_ini,fecha_fin,formato):
-    '''Partiendo de los historicos, voy a ver hasta que punto tengo datos reales, hasta llegar al presente. Los datos que no tenga los completare con ia.
-    Tambien añadire un archivo extra para indicar si es un dato real o de ia, para hacerlo real en el futuro.
-    SCRAP A OMIE CON UN SCRIPT DE GIT https://github.com/acruzgarcia/OMIEData
-    \nVoy a ver si tengo un archivo con los precios ya procesado. Si no preparo uno nuevo. De momento solo inicializo,
-con tener localizado la ruta de un archivo con datos de precios es suficiente '''
+    """
+    \nInicializa los datos de precios eléctricos futuros (OMIE), localizando archivos ya generados o creándolos si no existen.
+Si el archivo no cubre tod0 el rango solicitado, se genera automáticamente a partir de un scraper basado en el repositorio:
+https://github.com/acruzgarcia/OMIEData. Además, se genera un archivo "gemelo" que marca qué valores son reales y cuáles deberán completarse más adelante con IA u otro modelos.
+
+    \nParámetros:
+    \n- parametros : dict, JSON ya cargado con configuración general (rangos temporales).
+    \n- fecha_ini : datetime, fecha inicial del rango a completar.
+    \n- fecha_fin : datetime, fecha final del rango a completar.
+    \n- formato : str, formato de las fechas (de normal "%d-%m-%Y").
+
+    \nReturns:
+    \n- ruta_precios_presente_datos : str, ruta al archivo CSV con los valores de precios OMIE.
+    \n- ruta_precios_presente_fuente : str, ruta al archivo CSV que indica si cada dato es real o debe completarse en el futuro con IA o técnicas similares.
+    """
 
     carpeta = "DatosPython"  # carpeta donde están los archivos donde buscara el patron
     patron_datos = r"Datos_Omie_Presente_(\d{2}-\d{2}-\d{4})_a_(\d{2}-\d{2}-\d{4})\.csv"  # regex
@@ -198,9 +233,17 @@ con tener localizado la ruta de un archivo con datos de precios es suficiente ''
 
 
 def inicializar_irradiancias_historicos(parametros):
-    '''Con la libreria pysolar puedo buscar datos de irradancias solares disponibles en web por coordenadas
-    \nVoy a ver si tengo un archivo con los irradancias ya procesado. Si no preparo uno nuevo. De momento solo inicializo,
-con tener localizado la ruta de un archivo con datos de irradancias es suficiente '''
+    """
+    \nInicializa los datos históricos de irradiancia solar, localizando archivos ya generados o creándolos desde cero si no existen.
+Los datos se obtienen usando `pysolar`, a partir de coordenadas geográficas, altitud y zona horaria proporcionadas en los parámetros.
+En caso de necesitar creación, se usa el mismo rango de fechas del archivo de consumo de Edistribución (obteniendo su rango de fechas en el proceso).
+
+    \nParámetros:
+    \n- parametros : dict, JSON ya cargado con información de localización, altura y zona horaria.
+
+    \nReturns:
+    \n- ruta_irradiancias : str, ruta al archivo CSV con los datos de irradiancia solar histórica.
+    """
 
     carpeta = "DatosPython"  # carpeta donde están los archivos donde buscara el patron
     patron = r"Datos_Irradiancia_(\d{2}-\d{2}-\d{4})_a_(\d{2}-\d{2}-\d{4})\.csv" #regex
@@ -257,12 +300,22 @@ con tener localizado la ruta de un archivo con datos de irradancias es suficient
     return ruta_irradiancias
 
 def inicializar_irradiancias_futuros(parametros,fecha_ini,fecha_fin,formato):
-    '''Partiendo de los historicos, voy a ver hasta que punto tengo datos reales, hasta llegar al presente. Los datos que no tenga los completare con ia.
-    Tambien añadire un parametro para indicar si es un dato real o de ia, para hacerlo real en el futuro
-    Con la libreria pysolar puedo buscar datos de irradancias solares disponibles en web por coordenadas
-    \nVoy a ver si tengo un archivo con los irradancias ya procesado. Si no preparo uno nuevo. De momento solo inicializo,
-con tener localizado la ruta de un archivo con datos de irradancias es suficiente '''
+    """
+    \nInicializa los datos de irradiancia solar futura, localizando archivos previamente generados o creándolos si no existen.
+Los datos se obtienen usando `pysolar` a partir de coordenadas geográficas y altura sobre el nivel del mar, con zona horaria también definida en los parámetros.
+Si existen datos parciales previamente generados, se aprovechan para evitar scrapping redundante.
+Además, se crea un archivo gemelo que marca si cada valor es real o debe ser completado en el futuro por IA u otros métodos.
 
+    \nParámetros:
+    \n- parametros : dict, JSON ya cargado con información sobre la ubicación, altura y zona horaria.
+    \n- fecha_ini : datetime, fecha inicial del rango a cubrir.
+    \n- fecha_fin : datetime, fecha final del rango a cubrir.
+    \n- formato : str, formato de las fechas (de normal "%d-%m-%Y").
+
+    \nReturns:
+    \n- ruta_irradancias_presente_datos : str, ruta al CSV con los valores de irradiancia solar.
+    \n- ruta_irradancias_presente_fuente : str, ruta al CSV que indica si cada valor es real o ha de ser generado por IA.
+    """
 
     carpeta = "DatosPython"  # carpeta donde están los archivos donde buscara el patron
     patron_datos = r"Datos_Irradiancia_Presente_(\d{2}-\d{2}-\d{4})_a_(\d{2}-\d{2}-\d{4})\.csv"  # regex
@@ -325,9 +378,17 @@ con tener localizado la ruta de un archivo con datos de irradancias es suficient
 
 
 def inicializar_temperaturas_historicos(parametros):
-    '''Hago una request a la api de open meteo (https://archive-api.open-meteo.com/v1/archive), tiene una base de datos de temperaturas por coordenadas
-    \nVoy a ver si tengo un archivo con las temperaturas ya procesado. Si no preparo uno nuevo. De momento solo inicializo,
-con tener localizado la ruta de un archivo con datos de temperaturas es suficiente '''
+    """
+    \nInicializa los datos históricos (localiza y/o crea su csv) de temperatura haciendo una consulta a la API de Open-Meteo
+(https://archive-api.open-meteo.com/v1/archive) si no existen archivos previos procesados con el rango adecuado.
+Usa por defecto el rango de fechas definido en los archivos de consumo (Edistribución) si están disponibles.
+
+    \nParámetros:
+    \n- parametros : dict, JSON ya cargado con información de configuración (coordenadas, zona horaria, etc.).
+
+    \nReturns:
+    \n- ruta_temperaturas : str, ruta al CSV que contiene los datos de temperatura histórica para el rango deseado.
+    """
 
     carpeta = "DatosPython" # carpeta donde están los archivos donde buscara el patron
     patron = r"Datos_Temperaturas_(\d{2}-\d{2}-\d{4})_a_(\d{2}-\d{2}-\d{4})\.csv" #regex
@@ -378,11 +439,22 @@ con tener localizado la ruta de un archivo con datos de temperaturas es suficien
     return ruta_temperaturas
 
 def inicializar_temperaturas_futuros(parametros,fecha_ini,fecha_fin,formato):
-    '''Partiendo de los historicos, voy a ver hasta que punto tengo datos reales, hasta llegar al presente. Los datos que no tenga los completare con ia.
-    Tambien añadire un parametro para indicar si es un dato real o de ia, para hacerlo real en el futuro
-        Con la libreria pysolar puedo buscar datos de irradancias solares disponibles en web por coordenadas
-    \nVoy a ver si tengo un archivo con los irradancias ya procesado. Si no preparo uno nuevo. De momento solo inicializo,
-con tener localizado la ruta de un archivo con datos de irradancias es suficiente '''
+    """
+    \nInicializa los datos de temperaturas futuras y crea y/o localiza sus csv correspondientes, buscando archivos ya existentes con datos adecuados.
+Si no existen archivos que cubran el rango completo solicitado, se generan automáticamente mediante una solicitud a una api de temperaturas mundiales
+(https://api.open-meteo.com/v1/forecast) usando coordenadas y zona horaria especificadas en los parámetros.
+También  tiene capaccidad para marcar las fuentes (real o IA) en un archivo gemelo, por paridad con sus homologos, pero las temperaturas las obteendre siempre "reales" (api).
+
+    \nParámetros:
+    \n- parametros : dict, JSON ya cargado con información sobre la localización y los rangos temporales.
+    \n- fecha_ini : datetime, fecha inicial del rango a completar con datos (y fuentes).
+    \n- fecha_fin : datetime, fecha final del rango a completar con datos (y fuentes).
+    \n- formato : str, formato de las fechas (por ejemplo "%d-%m-%Y").
+
+    \nReturns:
+    \n- ruta_temperaturas_presente_datos : str, ruta al CSV con los valores de temperatura para el rango dado.
+    \n- ruta_temperaturas_presente_fuente : str, ruta al CSV que indica si cada dato es real o esta marcado para generar en un futuro (IA o modelo ARIMA).
+    """
 
 
     carpeta = "DatosPython"  # carpeta donde están los archivos donde buscara el patron
@@ -436,18 +508,34 @@ con tener localizado la ruta de un archivo con datos de irradancias es suficient
 
 
 def buscar_archivo_regex(carpeta,patron,parametros,fecha_min=None,fecha_max=None,formato=None,ignorar_fechas=False):
-    ''' Le doy el donde busco, el como busco y los parametros que necesite desde el json ya leido y en variable '''
+    """
+    \nBusca un archivo dentro de una carpeta cuyo nombre cumpla un patrón regex determinado,
+y que opcionalmente contenga un rango de fechas compatible con el periodo requerido.
+Si se encuentra un archivo válido, lo retorna. Permite ignorar las fechas para validar solo por nombre (util en el modo de futuro, que "obtengo lo que pueda/tenga".
+
+    \nParámetros:
+    \n- carpeta : str, ruta a la carpeta donde buscar los archivos.
+    \n- patron : str, expresión regular (regex) con grupos que capturan las fechas del archivo (ej: "Datos_Edistribucion_(\d{2}-\d{2}-\d{4})_a_(\d{2}-\d{2}-\d{4})\.csv"`).
+    \n- parametros : dict, configuración completa ya cargada del JSON (se usa para extraer fechas por defecto si no se pasan explícitamente).
+    \n- fecha_min : str o None, fecha mínima buscada. Si no se especifica, se obtiene del JSON.
+    \n- fecha_max : str o None, fecha máxima buscada. Si no se especifica, se obtiene del JSON.
+    \n- formato : str o None, formato de las fechas anteriores (por ejemplo, "%d-%m-%Y"). Si no se pasa, también se obtiene del JSON.
+    \n- ignorar_fechas : bool, si es True, se ignora el rango de fechas y se acepta el primer archivo que cumpla el patrón (para un "saca lo que encuentres").
+
+    \nReturns:
+    \n- archivo_encontrado : str o None, nombre del archivo que cumple las condiciones (regex y fechas), o None si no se encuentra ninguno.
+    """
 
     #si digo especificamente que fechas pues esas fechas y sus formatos, si no las busco
     if fecha_min is None or fecha_max is None or formato is None:
         # voy a trabajar con historicos y con datos luego. Tomo el rango mas amplio, eventualmente los usare, agilizo proceso buscando datos solo 1 vez
-        fecha_ini_historicos = parametros["rango_historicos"]["fecha_ini"]
-        fecha_fin_historicos = parametros["rango_historicos"]["fecha_fin"]
-        formato_historicos = parametros["rango_historicos"]["formato"]
+        fecha_ini_historicos = parametros["rango_historicos_set_1"]["fecha_ini"]
+        fecha_fin_historicos = parametros["rango_historicos_set_1"]["fecha_fin"]
+        formato_historicos = parametros["rango_historicos_set_1"]["formato"]
 
-        fecha_ini_futuros = parametros["rango_futuros"]["fecha_ini"]
-        fecha_fin_futuros = parametros["rango_futuros"]["fecha_fin"]
-        formato_futuros = parametros["rango_futuros"]["formato"]
+        fecha_ini_futuros = parametros["rango_historicos_set_2"]["fecha_ini"]
+        fecha_fin_futuros = parametros["rango_historicos_set_2"]["fecha_fin"]
+        formato_futuros = parametros["rango_historicos_set_2"]["formato"]
 
         # preparo fechas que buscare
         fecha_ini_historicos_dt = pd.to_datetime(fecha_ini_historicos, format=formato_historicos)
@@ -495,20 +583,35 @@ def buscar_archivo_regex(carpeta,patron,parametros,fecha_min=None,fecha_max=None
 
 
 def inicializar_vector_emparejados_historicos(parametros,ruta_datos_endesa,ruta_datos_omie,ruta_datos_solar,ruta_datos_temperaturas):
-    ''' Ya tengo las ruta de los archivos, ahora los combinare en un unico archivo. Aqui me interesa mas sacarlo como df que como csv. Igual hago una copia en csv por tener una copia "fisica".'''
+    """
+    \nInicializa y empareja los datos históricos provenientes de distintas fuentes (consumo, precio, solar, temperatura),
+generando un único DataFrame coherente que podrá ser usado en cálculos de entrenamiento u optimización.
+Toma dos rangos definidos en el JSON (`rango_historicos_set_1` y `rango_historicos_set_2`) y extrae el periodo más amplio posible entre ellos.
+Además de retornar el DataFrame emparejado, guarda una copia como CSV para respaldo o depuración.
+
+    \nParámetros:
+    \n- parametros : dict, JSON cargado con configuraciones y rangos históricos (`rango_historicos_set_1`, `rango_historicos_set_2`).
+    \n- ruta_datos_endesa : str, ruta a los datos brutos de consumo (Edistrución).
+    \n- ruta_datos_omie : str, ruta a los datos brutos de precios (OMIE).
+    \n- ruta_datos_solar : str, ruta a los datos brutos de irradiancia solar.
+    \n- ruta_datos_temperaturas : str, ruta a los datos brutos de temperatura.
+
+    \nReturns:
+    \n- datos_emparejados : pd.DataFrame, estructura combinada y validada de los datos históricos.
+    """
 
     carpeta = "DatosPython"
     nombre_archivo = "datosEOST_historicos_emparejados.csv"
     ruta_output = os.path.join(carpeta, nombre_archivo)
 
     # voy a trabajar con historicos y con datos luego. Tomo el rango mas amplio
-    fecha_ini_historicos = parametros["rango_historicos"]["fecha_ini"]
-    fecha_fin_historicos = parametros["rango_historicos"]["fecha_fin"]
-    formato_historicos = parametros["rango_historicos"]["formato"]
+    fecha_ini_historicos = parametros["rango_historicos_set_1"]["fecha_ini"]
+    fecha_fin_historicos = parametros["rango_historicos_set_1"]["fecha_fin"]
+    formato_historicos = parametros["rango_historicos_set_1"]["formato"]
 
-    fecha_ini_futuros = parametros["rango_futuros"]["fecha_ini"]
-    fecha_fin_futuros = parametros["rango_futuros"]["fecha_fin"]
-    formato_futuros = parametros["rango_futuros"]["formato"]
+    fecha_ini_futuros = parametros["rango_historicos_set_2"]["fecha_ini"]
+    fecha_fin_futuros = parametros["rango_historicos_set_2"]["fecha_fin"]
+    formato_futuros = parametros["rango_historicos_set_2"]["formato"]
 
     # preparo fechas que buscare
     fecha_ini_historicos_dt = pd.to_datetime(fecha_ini_historicos, format=formato_historicos)
@@ -537,20 +640,42 @@ def inicializar_vector_emparejados_historicos(parametros,ruta_datos_endesa,ruta_
     return datos_emparejados
 
 def inicializar_vector_emparejados_futuros(parametros, fecha_fin_input, formato_input, ruta_consumos_presente_datos, ruta_consumos_presente_fuente, ruta_precios_presente_datos, ruta_precios_presente_fuente, ruta_irradancias_presente_datos, ruta_irradancias_presente_fuente, ruta_temperaturas_presente_datos, ruta_temperaturas_presente_fuente):
-    ''' Ya tengo las ruta de los archivos, ahora los combinare en un unico archivo. Aqui me interesa mas sacarlo como df que como csv. Igual hago una copia en csv por tener una copia "fisica".'''
+    """
+    \nInicializa y empareja los datos historicos y futuros provenientes de distintas fuentes (consumo, precio, solar, temperatura),
+generando un único DataFrame coherente que podrá ser usado en cálculos de predicción u optimización.
+Usa como fecha de inicio el último punto válido entre los históricos (ambos set de datos) ya definidos, y como fecha de fin
+la proporcionada en `fecha_fin_input`. Además de retornar el DataFrame, guarda una copia en CSV para depuración y/o respaldo.
+
+    \nParámetros:
+    \n- parametros : dict, JSON ya cargado con configuraciones y rangos históricos.
+    \n- fecha_fin_input : str, fecha tope que se desea procesar, en el formato dado por `formato_input`. Sera un un dato en el futuro, normalmente hoy + 7 dias.
+    \n- formato_input : str, formato de la fecha anterior, normalmente "%d-%m-%Y".
+    \n- ruta_consumos_presente_datos : str, ruta a los datos brutos de consumo (Edistrución).
+    \n- ruta_consumos_presente_fuente : str, ruta del origen de los datos de consumo (si reales, o por generar o si son de ia etc).
+    \n- ruta_precios_presente_datos : str, ruta a los datos brutos de precios (OMIE).
+    \n- ruta_precios_presente_fuente : str, ruta del origen de los datos de precios (si reales, o por generar o si son de ia etc).
+    \n- ruta_irradancias_presente_datos : str, ruta a los datos brutos de irradiancia solar.
+    \n- ruta_irradancias_presente_fuente : str, ruta del origen de los datos de irradancia (si reales, o por generar o si son de ia etc).
+    \n- ruta_temperaturas_presente_datos : str, ruta a los datos brutos de temperatura.
+    \n- ruta_temperaturas_presente_fuente : str, ruta del origen de los datos de temperatura (si reales, o por generar o si son de ia etc).
+
+    \nReturns:
+    \n- datos_emparejados : pd.DataFrame, estructura unificada y validada de datos futuros.
+    \n- fuentes_emparejadas : pd.DataFrame, estructura unificada y validada de ruta del origen de los datos futuros.
+    """
 
     carpeta = "DatosPython"
     nombre_archivo = "datosEOST_futuros_emparejados.csv"
     ruta_output = os.path.join(carpeta, nombre_archivo)
 
     # voy a trabajar con historicos y con datos luego. Tomo el rango mas amplio
-    fecha_ini_historicos = parametros["rango_historicos"]["fecha_ini"]
-    fecha_fin_historicos = parametros["rango_historicos"]["fecha_fin"]
-    formato_historicos = parametros["rango_historicos"]["formato"]
+    fecha_ini_historicos = parametros["rango_historicos_set_1"]["fecha_ini"]
+    fecha_fin_historicos = parametros["rango_historicos_set_1"]["fecha_fin"]
+    formato_historicos = parametros["rango_historicos_set_1"]["formato"]
 
-    fecha_ini_futuros = parametros["rango_futuros"]["fecha_ini"]
-    fecha_fin_futuros = parametros["rango_futuros"]["fecha_fin"]
-    formato_futuros = parametros["rango_futuros"]["formato"]
+    fecha_ini_futuros = parametros["rango_historicos_set_2"]["fecha_ini"]
+    fecha_fin_futuros = parametros["rango_historicos_set_2"]["fecha_fin"]
+    formato_futuros = parametros["rango_historicos_set_2"]["formato"]
 
     # preparo fechas que buscare
     fecha_ini_historicos_dt = pd.to_datetime(fecha_ini_historicos, format=formato_historicos)
@@ -1122,35 +1247,35 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
     #el porcentaje espero que sea en forma decimal, es decir de 0 a 1, si no tiene sentido entonces da error. Si esta entre 1 y 100 tiro un warning y asumo lo metio en %, div entre 100
     try:
         capacidad_elegida_tot = parametros["bateria_elegida"]["capacidad_elegida_tot_kwh"]
-        porcentale_decimal_usable = parametros["bateria_elegida"]["porcentale_decimal_usable"]
+        porcentaje_decimal_usable = parametros["bateria_elegida"]["porcentaje_decimal_usable_capacidad"]
 
         # Verifica que ambos sean números
         if not isinstance(capacidad_elegida_tot, (int, float)):
             raise ValueError("El valor de 'capacidad_elegida_tot_kwh' debe ser numérico (kwh, por ejemplo 1).")
-        if not isinstance(porcentale_decimal_usable, (int, float)):
-            raise ValueError("El valor de 'porcentale_decimal_usable' debe ser numérico (en decimales, por ejemplo 0.5.")
+        if not isinstance(porcentaje_decimal_usable, (int, float)):
+            raise ValueError("El valor de 'porcentaje_decimal_usable' debe ser numérico (en decimales, por ejemplo 0.5.")
 
         # Validar que la capacidad no sea negativa
         if capacidad_elegida_tot < 0:
             raise ValueError("La 'capacidad_elegida_tot' no puede ser negativa. Debe ser 0 o un valor positivo.")
 
         # Validar porcentaje usable
-        if 1 < porcentale_decimal_usable <= 100:
+        if 1 < porcentaje_decimal_usable <= 100:
             print(
-                "⚠️  Advertencia: El valor de 'porcentale_decimal_usable' espera un numero decimal (0-1), pero parece estar en porcentaje (1–100). Se asumirá como tal y se dividirá entre 100.")
-            porcentale_decimal_usable = porcentale_decimal_usable / 100
-        elif not (0 < porcentale_decimal_usable <= 1):
+                "⚠️  Advertencia: El valor de 'porcentaje_decimal_usable' espera un numero decimal (0-1), pero parece estar en porcentaje (1–100). Se asumirá como tal y se dividirá entre 100.")
+            porcentaje_decimal_usable = porcentaje_decimal_usable / 100
+        elif not (0 < porcentaje_decimal_usable <= 1):
             raise ValueError(
-                "El valor de 'porcentale_decimal_usable' debe estar entre 0 y 1 (por ejemplo, 0.5). Probablemente escribiste un número fuera de rango.")
+                "El valor de 'porcentaje_decimal_usable' debe estar entre 0 y 1 (por ejemplo, 0.5). Probablemente escribiste un número fuera de rango.")
 
     except KeyError as e:
         raise ValueError(
-            f"Falta la clave esperada en los parámetros: {e}. Asegúrate de que 'bateria_elegida' contenga 'capacidad_elegida_tot' y 'porcentale_decimal_usable'.")
+            f"Falta la clave esperada en los parámetros: {e}. Asegúrate de que 'bateria_elegida' contenga 'capacidad_elegida_tot' y 'porcentaje_decimal_usable'.")
 
 
 
     # === calculo de la optimizacion del ciclo de la bateria de mannana ===
-    capacidad_usable = capacidad_elegida_tot*porcentale_decimal_usable
+    capacidad_usable = capacidad_elegida_tot * porcentaje_decimal_usable
     dic_tot,dic_mannana = subrutina_futuro_calc_optim(parametros, datos_combinados_IA, capacidad_bat=capacidad_usable)
     #print(dicc_fut)
 

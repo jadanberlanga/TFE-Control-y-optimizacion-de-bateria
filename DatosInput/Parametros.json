@@ -3,19 +3,20 @@
     "capacidad_bat_tipo": 1,
     "precio_bat_tipo": 200,
     "potencia_carga_bat_tipo": 1,
-    "potencia_descarga_bat_tipo": 1
+    "potencia_descarga_bat_tipo": 1,
+    "porcentaje_decimal_usable_capacidad": 0.6
   },
   "param_usuario": {
     "potencia_contratada": 4,
     "target_years": 10,
     "multiplicador": 1
   },
-  "rango_historicos": {
+  "rango_historicos_set_1": {
     "fecha_ini": "01-03-23",
     "fecha_fin": "01-03-24",
     "formato": "%d-%m-%y"
   },
-  "rango_futuros": {
+  "rango_historicos_set_2": {
     "fecha_ini": "02-03-24",
     "fecha_fin": "02-03-25",
     "formato": "%d-%m-%y"
@@ -52,6 +53,6 @@
   },
   "bateria_elegida": {
     "capacidad_elegida_tot_kwh": 1,
-    "porcentale_decimal_usable": 0.6
+    "porcentaje_decimal_usable_capacidad": 0.6
   }
 }
