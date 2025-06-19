@@ -9,8 +9,20 @@ import numpy as np
 import os, re, json
 
 def load_endesa(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
-    # hemos pedido cargar, miro si existe el archivo
-    # si existe lo cargo y ya. Si no tengo qeu salir a error, endesa son datos_input manuales
+    """
+    \nCarga datos originales de consumo eléctrico desde un archivo proporcionado por Edistribución ya procesado y guardado en formato estandar
+(formato `.csv` con separador por tabulaciones, filas las fechas, columnas las horas) y devuelve solo el subconjunto correspondiente al rango de fechas especificado.
+
+    \nParámetros:
+    \n- fecha_ini : str o datetime, fecha de inicio del rango deseado (inclusive).
+    \n- fecha_fin : str o datetime, fecha de fin del rango deseado (inclusive).
+    \n- format_fecha : str, formato de las fechas de entrada (ej: "%d-%m-%Y").
+    \n- ruta_archivo : str, ruta al archivo CSV exportado manualmente desde la web de Edistribución.
+
+    \nReturns:
+    \n- df : pandas.DataFrame con los datos cargados y recortados entre las fechas especificadas. Si el archivo no existe, retorna 0.
+    """
+
     if os.path.exists(ruta_archivo):
         print(f"El archivo {ruta_archivo} existe, cargando.")
         df = pd.read_csv(ruta_archivo, sep='\t')
@@ -22,39 +34,43 @@ def load_endesa(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
     # filtrar por la columna de DATE. Y le hacemos alguna modificacion para que la liberia de dataframe lo trabaje mejor
     fecha_ini = pd.to_datetime(fecha_ini, format=format_fecha)
     fecha_fin = pd.to_datetime(fecha_fin, format=format_fecha)
-    #print("confirma end")
-    #print(df)
+
     df["DATE"] = pd.to_datetime(df["DATE"], format="%Y-%m-%d") #todo mirar si eso puedo pasarselo de alguna forma?
     df = df.loc[(df["DATE"] >= fecha_ini) & (df["DATE"] <= fecha_fin)]
-    #print("·asderw")
 
     #print("datos_input df endesa recortados:")
     #print(df)
     return df
 
 def load_omie(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
-    #hemos pedido cargar, miro si existe el archivo
-    #si existe lo cargo y ya. Si no puedo meter un scrap automaticamente, y guardo para otra vez
+    """
+    \nCarga los precios eléctricos horarios desde un archivo procesado proveniente de OMIE. Si el archivo no existe aún, se procesará automáticamente
+a partir de scrap a la web de OMIE. El archivo de entrada debe tener formato `.csv` con separador por tabulaciones, columna 'DATE' y columnas de horas H1-H24.
+Solo se devuelve el subconjunto de fechas entre `fecha_ini` y `fecha_fin`.
+
+    \nParámetros:
+    \n- fecha_ini : str o datetime, fecha de inicio del rango deseado (inclusive).
+    \n- fecha_fin : str o datetime, fecha de fin del rango deseado (inclusive).
+    \n- format_fecha : str, formato de las fechas de entrada (ej: "%d-%m-%Y").
+    \n- ruta_archivo : str, ruta al archivo CSV procesado desde OMIE (o donde se generará si aún no existe).
+
+    \nReturns:
+    \n- df : pandas.DataFrame con los datos de precios horarios entre las fechas especificadas.
+    """
+
     if os.path.exists(ruta_archivo):
         print(f"El archivo {ruta_archivo} existe, cargando.")
         df = pd.read_csv(ruta_archivo, sep='\t')
     else:
         print(f"El archivo {ruta_archivo} no existe, procesando excels.")
-        #las fechas de la ruta del archivo pueden no ser iguales a las que me ineteresan ahora
-        #miro las fechas que estaran en el archivo para hacer scrap (usando regex)
-        '''patron = r'(\d{1,2}-\d{1,2}-\d{2})'
-        fechas_ruta = re.findall(patron, ruta_archivo)
-        fecha_ini_ruta = fechas_ruta[0]
-        fecha_fin_ruta = fechas_ruta[1]
-        print(fecha_ini_ruta)
-        print(fecha_fin_ruta)'''
-        df = omie.datos_omie_df(ruta_archivo) #no hace un scrap directo, lo prepara para ser usado en df
-        '''df.to_csv(ruta_archivo, sep='\t', index=False)'''
+        # obtengo datso de OMIE, pero no hace un scrap directo, lo prepara para ser usado en un df y gestiona bien que fechas debe usar para el scrap
+        df = omie.datos_omie_df(ruta_archivo)
 
     #de ese if else saco un df con tod0 el archivo cargado, pero solo quiero un rango de fechas, lo recorto
     #filtrar por la columna de DATE. Y le hacemos alguna modificacion para que la liberia de dataframe lo trabaje mejor
     fecha_ini = pd.to_datetime(fecha_ini, format=format_fecha)
     fecha_fin = pd.to_datetime(fecha_fin, format=format_fecha)
+
     df["DATE"] = pd.to_datetime(df["DATE"], format="%Y-%m-%d")
     df = df.loc[(df["DATE"] >= fecha_ini) & (df["DATE"] <= fecha_fin)]
 
@@ -63,8 +79,21 @@ def load_omie(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
     return df
 
 def load_solar(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
-    # hemos pedido cargar, miro si existe el archivo
-    # si existe lo cargo y ya. Si no puedo meter un scrap automaticamente, y guardo para otra vez
+    """
+    \nCarga los datos de irradiancia solar desde un archivo `.csv` con formato tabulado previamente procesado o generado.
+Si el archivo no existe, se generará automáticamente a partir de la función `solar.datos_solar_df(...)`, usando la libreria pysolar.
+El archivo debe tener una columna `'DATE'` con las fechas y columnas de irradiancia horaria (H1-H24).
+
+    \nParámetros:
+    \n- fecha_ini : str o datetime, fecha de inicio del rango deseado (inclusive).
+    \n- fecha_fin : str o datetime, fecha de fin del rango deseado (inclusive).
+    \n- format_fecha : str, formato de las fechas de entrada (ej: "%d-%m-%Y").
+    \n- ruta_archivo : str, ruta al archivo CSV procesado de irradiancia solar (o donde se generará si no existe).
+
+    \nReturns:
+    \n- df : pandas.DataFrame con los datos de irradiancia horaria entre las fechas especificadas.
+    """
+
     if os.path.exists(ruta_archivo):
         print(f"El archivo {ruta_archivo} existe, cargando.")
         df = pd.read_csv(ruta_archivo, sep='\t')
@@ -76,6 +105,7 @@ def load_solar(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
     # filtrar por la columna de Fecha. Y le hacemos alguna modificacion para que la liberia de dataframe lo trabaje mejor
     fecha_ini = pd.to_datetime(fecha_ini, format=format_fecha)
     fecha_fin = pd.to_datetime(fecha_fin, format=format_fecha)
+
     df["DATE"] = pd.to_datetime(df["DATE"], format="%Y-%m-%d")
     df = df.loc[(df["DATE"] >= fecha_ini) & (df["DATE"] <= fecha_fin)]
 
@@ -84,8 +114,23 @@ def load_solar(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
     return df
 
 def load_temperatura(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
-    # hemos pedido cargar, miro si existe el archivo
-    # si existe lo cargo y ya. Si no puedo meter un scrap automaticamente, y guardo para otra vez
+    """
+    \nCarga los datos de temperatura horaria desde un archivo `.csv` previamente procesado o generado.
+Si el archivo no existe, se generará automáticamente usando la función `temperatura.datos_temperatura_df(...)`,
+que consulta la API pública de Open-Meteo para obtener datos históricos de temperatura por coordenadas.
+El archivo debe tener una columna `'DATE'` con las fechas (en formato `YYYY-MM-DD`) y columnas de temperatura horaria (H1-H24).
+Se devuelve únicamente el subconjunto correspondiente al rango de fechas especificado.
+
+    \nParámetros:
+    \n- fecha_ini : str o datetime, fecha de inicio del rango deseado (inclusive).
+    \n- fecha_fin : str o datetime, fecha de fin del rango deseado (inclusive).
+    \n- format_fecha : str, formato de las fechas de entrada (ej: "%d-%m-%Y").
+    \n- ruta_archivo : str, ruta al archivo CSV procesado de temperaturas (o donde se generará si no existe).
+
+    \nReturns:
+    \n- df : pandas.DataFrame con los datos de temperatura horaria entre las fechas especificadas.
+    """
+
     if os.path.exists(ruta_archivo):
         print(f"El archivo {ruta_archivo} existe, cargando.")
         df = pd.read_csv(ruta_archivo, sep='\t')
@@ -97,6 +142,7 @@ def load_temperatura(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
     # filtrar por la columna de Fecha. Y le hacemos alguna modificacion para que la liberia de dataframe lo trabaje mejor
     fecha_ini = pd.to_datetime(fecha_ini, format=format_fecha)
     fecha_fin = pd.to_datetime(fecha_fin, format=format_fecha)
+
     df["DATE"] = pd.to_datetime(df["DATE"], format="%Y-%m-%d")
     df = df.loc[(df["DATE"] >= fecha_ini) & (df["DATE"] <= fecha_fin)]
 
@@ -104,30 +150,40 @@ def load_temperatura(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
     # print(df)
     return df
 
-def alinear_datos_futuros(parametros_json,datos_endesa,datos_omie,datos_solar,datos_temperatura,bypass_string=False):
-    """esta no sera una funcion que haga tod0, pero mas bien hara unas comprobaciones previas que haga que pasen el check de paridad que ya tengo"""
-
-    # Obtener fechas mínima y máxima del DataFrame de Endesa, por ejemplo
-    fecha_min = datos_endesa["DATE"].min()
-    fecha_max = datos_endesa["DATE"].max()
-
-    # Recortar todos los DataFrame al mismo rango de fechas
-    datos_endesa = datos_endesa[(datos_endesa["DATE"] >= fecha_min) & (datos_endesa["DATE"] <= fecha_max)]
-    datos_omie = datos_omie[(datos_omie["DATE"] >= fecha_min) & (datos_omie["DATE"] <= fecha_max)]
-    datos_solar = datos_solar[(datos_solar["DATE"] >= fecha_min) & (datos_solar["DATE"] <= fecha_max)]
-    datos_temperatura = datos_temperatura[(datos_temperatura["DATE"] >= fecha_min) & (datos_temperatura["DATE"] <= fecha_max)]
-
-
-    df_alin_fut = alinear_datos(parametros_json,datos_endesa,datos_omie,datos_solar,datos_temperatura,bypass_string=bypass_string, silent=False)
-    #print("df_alin_fut")
-    #print(df_alin_fut)
-
-    return df_alin_fut
-
-
 def alinear_datos(parametros_json,datos_endesa,datos_omie,datos_solar,datos_temperatura,bypass_string=False,silent=False):
-    #lo primero es estandarizar los formatos de omie y endesa
-    #me valgo de utilidades de utilidades de la lib df, concretamente formato long usando .melt (para horas)
+    """
+    \nCombina y alinea en un único DataFrame los datos horarios de precio (OMIE), demanda (Edistribución), potencia solar e irradiancia (PySolar),
+y temperatura (Open-Meteo). Cada fuente de datos se convierte al formato *long* usando `.melt`, normalizando la hora como `'H1'`, `'H2'`, ..., `'H24'`,
+y se fusionan mediante `merge` por columnas `DATE` y `Hora`.
+
+Además, se calculan columnas auxiliares como número de día (`Dia_int`), día de la semana (`Dia_sem`) y mes (`Mes`). También se aplican
+transformaciones según parámetros del usuario: multiplicador de demanda, conversión de precio a €/kWh, y potencia generada por los paneles solares
+a partir de la irradiancia.
+
+Es la funcion principal de este archivo.
+
+    \nParámetros:
+    \n- parametros_json : dict, configuración con parámetros de usuario (`multiplicador`, eficiencia solar, etc.).
+    \n- datos_endesa : pd.DataFrame, datos de demanda energética histórica (kWh) en formato ancho (una fecha por fila, horas en columnas).
+    \n- datos_omie : pd.DataFrame, datos de precios horarios de electricidad en €/MWh en formato ancho (una fecha por fila, horas en columnas).
+    \n- datos_solar : pd.DataFrame, datos de irradiancia solar horaria en W/m² en formato ancho (una fecha por fila, horas en columnas).
+    \n- datos_temperatura : pd.DataFrame, datos de temperatura horaria en °C en formato ancho (una fecha por fila, horas en columnas).
+    \n- bypass_string : bool, si es True se saltan las operaciones numéricas (útil si se espera algún tipo de string, los cuales llegaran en el modo de fuentes de los datos futuros).
+    \n- silent : bool, si es True suprime el `print()` del resumen tabular de los datos alineados.
+
+    \nReturns:
+    \n- df_merged : pandas.DataFrame, con columnas:
+        - 'DATE': fecha de cada registro (formato largo, cada dia tendra 24 filsa (24 horas, 1 por fila)).
+        - 'Dia_int': día numérico consecutivo (1 en adelante. No es igual al numero de filas por que 1 dia son 24 filas).
+        - 'Mes': mes correspondiente.
+        - 'Dia_sem': día de la semana (lunes=0, domingo=6).
+        - 'Hora': hora en formato 'H1', ..., 'H24' (formato OMIE).
+        - 'Hora_int': hora como entero (1 a 24).
+        - 'Precio': precio de la electricidad en €/kWh.
+        - 'Demanda': demanda horaria ajustada según el multiplicador.
+        - 'PotenciaSolar': energía generada por los paneles solares en esa hora, calculada a partir de irradancia solar y datos de paneles del usuario.
+        - 'Temperatura': temperatura horaria en °C.
+    """
 
     #Datos de Omie al formato largo, y pongo ya que es el precio
     datos_omie_long = datos_omie.melt(id_vars=["DATE"], var_name="Hora", value_name="Precio")
@@ -141,21 +197,7 @@ def alinear_datos(parametros_json,datos_endesa,datos_omie,datos_solar,datos_temp
     # Datos de temperaturas al formato largo, y pongo ya que es la temperatura
     datos_temperatura_long = datos_temperatura.melt(id_vars=["DATE"], var_name="Hora", value_name="Temperatura")
 
-    '''    
-    #Con el estandar de endesa era asi. Ahora uso datos de edistribucion
-    #vamos a normalizar las horas usando el estandar de Omie, por ejemplo
-    #pasar de 00:00-01:00, 01:00-02:00, ... a H1, H2, ...
-    #Puedo tomar de base los primeros 2 caracteres de endesa (00, 01, ...) y les sumo 1 por que empieza en 00
-    #en detalle, lo hago string, luego parto por los : y me quedo la primera parte, y luego a int y +1
-    #de paso al hacerlo int ya pierde el 01 y queda solo en 1, justo como el formato de OMIE
-    datos_endesa_long["Hora"] = datos_endesa_long["Hora"].str.split(":").str[0].astype(int) + 1
-    #Y luego les pongo una H
-    datos_endesa_long["Hora"] = "H" + datos_endesa_long["Hora"].astype(str)
-    '''
 
-    ##vamos a normalizar las horas usando el estandar de Omie, por ejemplo
-    #pasar de 1, 2, ... a H1, H2, ... -> Basicamente ponerle una H
-    #datos_endesa_long["Hora"] = "H" + datos_endesa_long["Hora"].astype(str)
 
     #y ya podemos combinar. La idea es dejar una columna de fechas, otra de horas (varias horas para la misma fecha)
     #y para cada hora un precio y una demanda
@@ -178,6 +220,8 @@ def alinear_datos(parametros_json,datos_endesa,datos_omie,datos_solar,datos_temp
 
     #print(df_merged)
 
+
+
     #y ordenalo para que quede bonito. Lo malo del sistema de OMIE es que ordena H1 y luego H10, H11 y asi, son strings
     #hay que meter una columna aux, con horas int, y ordenar con los ints. Y puede ser util a futuro asi que la dejare ahi
     df_merged["Hora_int"] = df_merged["Hora"].str.extract(r'(\d+)').astype(int)
@@ -192,6 +236,7 @@ def alinear_datos(parametros_json,datos_endesa,datos_omie,datos_solar,datos_temp
 
     # calcular el mes (0 a 11)
     df_merged["Mes"] = df_merged["DATE"].dt.month
+
 
 
     if not bypass_string:
@@ -233,8 +278,73 @@ def alinear_datos(parametros_json,datos_endesa,datos_omie,datos_solar,datos_temp
 
     return df_merged
 
+def alinear_datos_futuros(parametros_json,datos_endesa,datos_omie,datos_solar,datos_temperatura,bypass_string=False):
+    """
+    \nPrepara y alinea los datos futuros de entrada (precios, demanda, solar, temperatura) para que tengan consistencia temporal y de formato
+antes de ser procesados por la función `alinear_datos(...)`. Esta función sirve como paso previo de validación, asegurando que los datos que genero
+esten en un formato compatible con dicha funcion de alinear_datos, la cual me dara un DataFrame al que no le tendre que hacer ningun cambio
+
+El resultado final es un `DataFrame` largo, como el que genera `alinear_datos`, pero a partir de fuentes no reales (previsiones futuras).
+
+    \nParámetros:
+    \n- parametros_json : dict, configuración con parámetros del usuario (`multiplicador`, coeficientes solares, etc.).
+    \n- datos_endesa : pd.DataFrame, datos de demanda futura (formato ancho: fechas por fila, horas por columnas).
+    \n- datos_omie : pd.DataFrame, datos de precios futuros (€/MWh) en formato ancho.
+    \n- datos_solar : pd.DataFrame, datos de irradiancia solar estimada en formato ancho.
+    \n- datos_temperatura : pd.DataFrame, datos de temperatura futura en formato ancho.
+    \n- bypass_string : bool, si es True evita operaciones numéricas (útil para usar este paso sobre fuentes que contienen strings como "Real" o "AGenerar").
+
+    \nReturns:
+    \n- df_alin_fut : pandas.DataFrame, datos alineados y estandarizados en formato largo, con las mismas columnas que `alinear_datos`.
+    """
+
+    # Obtener fechas mínima y máxima del DataFrame de Endesa, por ejemplo
+    fecha_min = datos_endesa["DATE"].min()
+    fecha_max = datos_endesa["DATE"].max()
+
+    # Recortar todos los DataFrame al mismo rango de fechas
+    datos_endesa = datos_endesa[(datos_endesa["DATE"] >= fecha_min) & (datos_endesa["DATE"] <= fecha_max)]
+    datos_omie = datos_omie[(datos_omie["DATE"] >= fecha_min) & (datos_omie["DATE"] <= fecha_max)]
+    datos_solar = datos_solar[(datos_solar["DATE"] >= fecha_min) & (datos_solar["DATE"] <= fecha_max)]
+    datos_temperatura = datos_temperatura[(datos_temperatura["DATE"] >= fecha_min) & (datos_temperatura["DATE"] <= fecha_max)]
+
+
+    df_alin_fut = alinear_datos(parametros_json,datos_endesa,datos_omie,datos_solar,datos_temperatura,bypass_string=bypass_string, silent=False)
+    #print("df_alin_fut")
+    #print(df_alin_fut)
+
+    return df_alin_fut
+
 def alinear_datos_futuros_IA(parametros_json,datos_temperatura,fechas_str):
-    """me voy a hacer un df similar al que ya tenia para historicos, pero esta vez para futuros. Solo necesito 1 o 2 dias pero por standarizar. Esta vez mi base sera la temperatura, es el primer que predigo"""
+    """
+    \nConstruye un DataFrame alineado en formato largo a partir de predicciones de temperatura obtenidas de la api de Open meteo.
+Este DataFrame servirá como estructura base para las predicciones futuras con IA y creaciopn de sus respectivos modelos de demanda, precio o potencia solar, asegurando que el formato
+coincida exactamente con el de los datos históricos procesados por `alinear_datos(...)`.
+
+Usa como punto de partida una serie de temperaturas predichas y las fechas/horas asociadas a cada valor. Calcula automáticamente
+variables auxiliares como el número de día, día de la semana y el mes, además de normalizar la hora al formato `'H1'` a `'H24'`.
+Deja columnas vacías (`NaN`) para variables aún no predichas (Precio, Demanda, PotenciaSolar), para que puedan ser generados  más adelante
+por modelos de IA (y en el proceso crear dichos modelos y poder comparar y evaluar con los reales).
+
+    \nParámetros:
+    \n- parametros_json : dict, configuración del usuario (se incluye para mantener firma compatible y por posible uso futuro).
+    \n- datos_temperatura : list o np.array, lista de temperaturas predichas por hora (una por cada `fecha` en `fechas_str`).
+    \n- fechas_str : list de str o datetime, lista de fechas y horas asociadas a cada temperatura (debe tener la misma longitud que `datos_temperatura`).
+
+    \nReturns:
+    \n- df_merged : pandas.DataFrame con las columnas:
+        - 'DATE': fecha correspondiente.
+        - 'Dia_int': número de día consecutivo (comienza en 1).
+        - 'Mes': mes de la fecha.
+        - 'Dia_sem': día de la semana (lunes=0, domingo=6).
+        - 'Hora': hora normalizada al formato 'H1' a 'H24'.
+        - 'Hora_int': hora como entero (1 a 24).
+        - 'Precio': valor nulo (`NaN`), se rellenará luego.
+        - 'Demanda': valor nulo (`NaN`), se rellenará luego.
+        - 'PotenciaSolar': valor nulo (`NaN`), se rellenará luego.
+        - 'Temperatura': temperatura horaria predicha con la api de Open meteo.
+    """
+
     # Crear DataFrame base
     df = pd.DataFrame({
         "Datetime": pd.to_datetime(fechas_str),
@@ -274,17 +384,6 @@ def alinear_datos_futuros_IA(parametros_json,datos_temperatura,fechas_str):
     #y re ordeno las columnas de paso
     df_merged = df[['DATE','Dia_int', 'Mes', 'Dia_sem', 'Hora', 'Hora_int', 'Precio', 'Demanda', 'PotenciaSolar', 'Temperatura']]
 
-    """
-    print("\nPreview datos_input unidos:")
-    #pare mostrar mejor en consola con el print
-    pd.set_option('display.max_columns', None)  # muestra todas las columnas
-    pd.set_option('display.width', 1000)  # ancho de impresión grande
-    pd.set_option('display.max_rows', 24)  # muestra hasta 24 filas
-    pd.set_option('display.float_format', lambda x: f'{x:.5f}') #5 decimales
-    print(df_merged.head(24)) #24 filas
-    print("--------------------------------\n")
-    """
-
 
     print("\nPreview datos_input unidos (futuros):")
     #pare mostrar mejor en consola con el print
@@ -300,7 +399,33 @@ def alinear_datos_futuros_IA(parametros_json,datos_temperatura,fechas_str):
     return df_merged
 
 def comprobar_paridad(datos_endesa,datos_omie,datos_solar,datos_temperatura,datos_alineados):
-    #funcion de true o false, y el return sera ese bool
+    """
+    \nRealiza una validación exhaustiva de paridad y consistencia entre los distintos `DataFrame` de entrada (Endesa, OMIE, solar, temperatura)
+y el `DataFrame` combinado (`datos_alineados`). Esta función evalúa si las matrices de datos están correctamente emparejadas en longitud, ausencia
+de valores nulos y coherencia estructural por hora y día.
+
+La función aplica varias comprobaciones:
+- ✅ Verifica que todos los `DataFrame` tengan la misma cantidad total de registros horarios (24 por día).
+- ✅ Confirma que no haya valores faltantes (`NaN`) en `datos_alineados`.
+- ⚠️ Detecta valores numéricos anómalos que superen 10 veces la media de su respectiva columna.
+- ✅ Comprueba que cada día tenga exactamente 24 horas registradas.
+
+Se devuelve `True` solo si todas las validaciones críticas se cumplen (longitud, NaN, horas por día).
+La comprobación de valores extremos no bloquea la validación pero emite un aviso por consola.
+
+    \nParámetros:
+    \n- datos_endesa : pd.DataFrame, matriz de demanda energética (formato ancho: fechas por fila, horas por columnas).
+    \n- datos_omie : pd.DataFrame, matriz de precios eléctricos (formato ancho).
+    \n- datos_solar : pd.DataFrame, matriz de irradiancia solar (formato ancho).
+    \n- datos_temperatura : pd.DataFrame, matriz de temperaturas horarias (formato ancho).
+    \n- datos_alineados : pd.DataFrame, datos fusionados en formato largo (una fila por hora).
+
+    \nReturns:
+    \n- flag_paridad : bool
+        - `True` si los datos han sido validados y están correctamente emparejados.
+        - `False` si alguna validación crítica ha fallado (mismatch de longitudes, NaN, días incompletos).
+    """
+
     #compruebo longitud de los datos_input, en principio deberia ser igual los 3
     longitud_endesa = datos_endesa.shape[0] * (datos_endesa.shape[1] - 1)  #viene en una matriz de (dias x (horas+fecha))
     longitud_omie = datos_omie.shape[0] * (datos_omie.shape[1] - 1)        #viene en una matriz de (dias x (horas+fecha))
@@ -362,9 +487,31 @@ def comprobar_paridad(datos_endesa,datos_omie,datos_solar,datos_temperatura,dato
     return flag_paridad
 
 def emparejar_datos_historicos(fecha_ini=None, fecha_fin=None, format=None, ruta_datos_endesa=None,
-                    ruta_datos_omie=None,ruta_datos_solar=None, ruta_datos_temperaturas=None, ruta_output="datosEOST_historicos_emparejados.csv", parametros_json=None):
+    ruta_datos_omie=None,ruta_datos_solar=None, ruta_datos_temperaturas=None, ruta_output="datosEOST_historicos_emparejados.csv", parametros_json=None):
+    """
+    \nCarga, alinea y valida los datos históricos necesarios para el sistema de optimización energética.
+Esta función actúa como un pipeline completo: lee los archivos de consumo (Endesa), precios eléctricos (OMIE), irradiancia solar (PySolar)
+y temperatura (Open-Meteo), los recorta al rango de fechas deseado, los convierte a formato largo, los alinea y fusiona en un único `DataFrame`.
 
-    #Cargo todos los datos_input y emparejo
+Después de la fusión, se realiza una comprobación de paridad estructural y numérica mediante `comprobar_paridad(...)`.
+Si los datos pasan todas las validaciones, se guardan automáticamente en un archivo `.csv` en la ruta proporcionada.
+
+    \nParámetros:
+    \n- fecha_ini : str o datetime, fecha inicial del rango histórico. Si se deja en `None`, se obtiene desde `parametros_json`.
+    \n- fecha_fin : str o datetime, fecha final del rango histórico. Si se deja en `None`, se obtiene desde `parametros_json`.
+    \n- format : str, formato de las fechas (ej: "%d-%m-%Y"). Si se deja en `None`, se obtiene desde `parametros_json`.
+    \n- ruta_datos_endesa : str, ruta al archivo CSV con los datos de consumo eléctrico.
+    \n- ruta_datos_omie : str, ruta al archivo CSV con precios eléctricos históricos de OMIE.
+    \n- ruta_datos_solar : str, ruta al archivo CSV con irradiancia solar horaria.
+    \n- ruta_datos_temperaturas : str, ruta al archivo CSV con temperaturas horarias.
+    \n- ruta_output : str, ruta donde se guardarán los datos alineados si tod0 es correcto (por defecto: "datosEOST_historicos_emparejados.csv").
+    \n- parametros_json : dict, configuración con el rango de fechas y parámetros del usuario.
+
+    \nReturns:
+    \n- datos_emparejados : pandas.DataFrame
+        - Si la alineación y validación son correctas, contiene los datos históricos alineados en formato largo y ya listos para usar en calculos.
+        - Si hay errores de paridad, devuelve un `DataFrame` vacío y emite un mensaje de error.
+    """
 
     #si alguno no esta mejor los cargo todos de vuelta
     if fecha_ini is None or fecha_fin is None or format is None:
@@ -397,7 +544,38 @@ def emparejar_datos_historicos(fecha_ini=None, fecha_fin=None, format=None, ruta
     return datos_emparejados
 
 def emparejar_datos_futuros(fecha_ini=None, fecha_fin=None, format=None, ruta_datos_endesa=None, ruta_fuente_endesa=None,
-                    ruta_datos_omie=None, ruta_fuente_omie=None, ruta_datos_solar=None, ruta_fuente_solar=None,  ruta_datos_temperaturas=None, ruta_fuente_temperaturas=None,  ruta_output="datosEOST_futuros_emparejados.csv", parametros_json=None):
+    ruta_datos_omie=None, ruta_fuente_omie=None, ruta_datos_solar=None, ruta_fuente_solar=None,  ruta_datos_temperaturas=None, ruta_fuente_temperaturas=None,  ruta_output="datosEOST_futuros_emparejados.csv", parametros_json=None):
+    """
+    \nEmpareja, alinea y valida los datos futuros generados por modelos de IA (o por otras fuentes de predicción),
+comprobando su coherencia estructural y temporal frente a sus correspondientes fuentes de origen (`AGenerar`, `Real`, `ModeloA`, etc.).
+
+Esta función actúa como un pipeline de procesamiento de datos futuros: carga los datos predichos y sus fuentes desde archivos `.csv` ya generados,
+los recorta al mismo rango de fechas, los convierte al formato largo, los alinea con `alinear_datos_futuros(...)` y realiza comprobaciones
+de paridad estructural con `comprobar_paridad(...)`. Si tod0 es consistente, guarda los datos futuros en disco y devuelve ambos `DataFrame`.
+
+    \nParámetros:
+    \n- fecha_ini : str o datetime, fecha inicial del rango futuro (inclusive).
+    \n- fecha_fin : str o datetime, fecha final del rango futuro (inclusive).
+    \n- format : str, formato de las fechas de entrada (ej: "%d-%m-%Y").
+    \n- ruta_datos_endesa : str, ruta al CSV con las predicciones de demanda futura.
+    \n- ruta_fuente_endesa : str, ruta al CSV con la fuente asociada a cada valor de demanda (ej: "Real", "AGenerar").
+    \n- ruta_datos_omie : str, ruta al CSV con las predicciones de precios eléctricos futuros.
+    \n- ruta_fuente_omie : str, ruta al CSV con la fuente asociada a cada precio.
+    \n- ruta_datos_solar : str, ruta al CSV con predicciones de irradiancia solar futura.
+    \n- ruta_fuente_solar : str, ruta al CSV con la fuente asociada a cada irradiancia.
+    \n- ruta_datos_temperaturas : str, ruta al CSV con predicciones de temperatura futura.
+    \n- ruta_fuente_temperaturas : str, ruta al CSV con la fuente asociada a cada temperatura.
+    \n- ruta_output : str, ruta donde se guardarán los datos futuros alineados (por defecto: "datosEOST_futuros_emparejados.csv").
+    \n- parametros_json : dict, configuración con parámetros del usuario (ej. multiplicador, coeficientes solares, etc.).
+
+    \nReturns:
+    \n- datos_emparejados : pd.DataFrame o False
+        - `DataFrame` con los datos futuros alineados y validados, si la validación fue correcta.
+        - Si hay errores de paridad, devuelve un `DataFrame` vacío y emite un mensaje de error.
+    \n- fuentes_emparejadas : pd.DataFrame o False
+        - `DataFrame` con las fuentes de cada dato alineadas (formato largo), listas para evaluación y visualización.
+        - Si hay errores de paridad, devuelve un `DataFrame` vacío y emite un mensaje de error.
+    """
 
     #Cargo todos los datos_input y emparejo
 
@@ -422,19 +600,6 @@ def emparejar_datos_futuros(fecha_ini=None, fecha_fin=None, format=None, ruta_da
     datos_temperatura = load_temperatura(fecha_ini, fecha_fin, format, ruta_datos_temperaturas) # funcion para cargar datos_input de temperaturas
     fuentes_temperatura = load_temperatura(fecha_ini, fecha_fin, format, ruta_fuente_temperaturas)  # funcion para cargar fuentes de temperaturas
 
-    """
-    print("test prints df")
-    print(datos_endesa)
-    print(fuentes_endesa)
-    print(datos_omie)
-    print(fuentes_omie)
-    print(datos_solar)
-    print(fuentes_solar)
-    print(datos_temperatura)
-    print(fuentes_temperatura)
-    print("test prind df fin")
-    """
-
     datos_alineados = alinear_datos_futuros(parametros_json, datos_endesa, datos_omie, datos_solar,datos_temperatura, bypass_string=False)  # los combino y alineo
     fuentes_alineados = alinear_datos_futuros(parametros_json, fuentes_endesa, fuentes_omie, fuentes_solar,fuentes_temperatura, bypass_string=True)  # los combino y alineo. Y estos son strings, no puedo operar, byspass algunas cosas
     #print("check datos alineados")
@@ -454,13 +619,15 @@ def emparejar_datos_futuros(fecha_ini=None, fecha_fin=None, format=None, ruta_da
 
         #las fuentes no las guardare, pero si pasare el df, me hara falta
         fuentes_emparejadas = fuentes_alineados
+
     else:
         print('error alineando datos, no guardados')
-        datos_emparejados = False
-        fuentes_emparejadas = False
+        datos_emparejados = pd.DataFrame()
+        fuentes_emparejadas = pd.DataFrame()
 
     return datos_emparejados, fuentes_emparejadas
 
+"""
 def rellenar_con_IA_datos_futuros(parametros_json,datos_temperatura,datos_endesa,fuentes_endesa,datos_omie,fuentes_omie,datos_solar,fuentes_solar):
 
     #Antes de hacer nada con esos datos tengo que generar lo que falte. Los paso por la IA
@@ -470,6 +637,7 @@ def rellenar_con_IA_datos_futuros(parametros_json,datos_temperatura,datos_endesa
     datos_temperatura_IA = datos_temperatura
 
     return
+"""
 
 if __name__ == '__main__':
     print("test_main_emparejar_E-O")

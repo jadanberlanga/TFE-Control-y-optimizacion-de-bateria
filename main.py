@@ -639,7 +639,9 @@ Además de retornar el DataFrame emparejado, guarda una copia como CSV para resp
 
     return datos_emparejados
 
-def inicializar_vector_emparejados_futuros(parametros, fecha_fin_input, formato_input, ruta_consumos_presente_datos, ruta_consumos_presente_fuente, ruta_precios_presente_datos, ruta_precios_presente_fuente, ruta_irradancias_presente_datos, ruta_irradancias_presente_fuente, ruta_temperaturas_presente_datos, ruta_temperaturas_presente_fuente):
+def inicializar_vector_emparejados_futuros(parametros, fecha_fin_input, formato_input, ruta_consumos_presente_datos,
+    ruta_consumos_presente_fuente, ruta_precios_presente_datos, ruta_precios_presente_fuente, ruta_irradancias_presente_datos,
+    ruta_irradancias_presente_fuente, ruta_temperaturas_presente_datos, ruta_temperaturas_presente_fuente):
     """
     \nInicializa y empareja los datos historicos y futuros provenientes de distintas fuentes (consumo, precio, solar, temperatura),
 generando un único DataFrame coherente que podrá ser usado en cálculos de predicción u optimización.
