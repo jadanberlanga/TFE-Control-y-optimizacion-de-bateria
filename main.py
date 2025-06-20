@@ -931,7 +931,7 @@ Se parte de un DataFrame con los datos necesarios y se llama directamente a la f
     #No estoy gestionando tantos datos aqui, no es necesario usar databases (shelve)
     #De hecho no necesito ni jsons, solo sacare unos pocos vectores de no mas de unas decenas de valores cada uno, puedo irme a la funcion core de calculo directamente
 
-    diccionario_resultados = calculo.calculo_CPU(parametros_json, datos_filtrado, precio_unit_bat_tipo=0,capacidad_bateria_fija=capacidad_bat,carga_previa=0,carga_restante=0,permitido_inyectar = False)
+    diccionario_resultados = calculo.calculo_CPU(parametros_json, datos_filtrado,capacidad_bateria_fija=capacidad_bat,carga_previa=0,carga_restante=0,permitido_inyectar = False)
 
     precio = diccionario_resultados["precio"]
     demanda_casa = diccionario_resultados["demanda_casa"]
@@ -1249,7 +1249,8 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
     #el porcentaje espero que sea en forma decimal, es decir de 0 a 1, si no tiene sentido entonces da error. Si esta entre 1 y 100 tiro un warning y asumo lo metio en %, div entre 100
     try:
         capacidad_elegida_tot = parametros["bateria_elegida"]["capacidad_elegida_tot_kwh"]
-        porcentaje_decimal_usable = parametros["bateria_elegida"]["porcentaje_decimal_usable_capacidad"]
+        #porcentaje_decimal_usable = parametros["bateria_elegida"]["porcentaje_decimal_usable_capacidad"]
+        porcentaje_decimal_usable = 1 #aplico el parametro en el calculo de optimizacion como un dato mas de la bateria mejor, no necesito aplicarlo aqui
 
         # Verifica que ambos sean números
         if not isinstance(capacidad_elegida_tot, (int, float)):

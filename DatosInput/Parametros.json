@@ -4,7 +4,7 @@
     "precio_bat_tipo": 200,
     "potencia_carga_bat_tipo": 1,
     "potencia_descarga_bat_tipo": 1,
-    "porcentaje_decimal_usable_capacidad": 0.6
+    "porcentaje_decimal_usable_capacidad": 0.75
   },
   "param_usuario": {
     "potencia_contratada": 4,
@@ -52,7 +52,6 @@
     "modelo_precio": "DatosIA/modelo_precio_omie.pt"
   },
   "bateria_elegida": {
-    "capacidad_elegida_tot_kwh": 1,
-    "porcentaje_decimal_usable_capacidad": 0.6
+    "capacidad_elegida_tot_kwh": 1
   }
 }

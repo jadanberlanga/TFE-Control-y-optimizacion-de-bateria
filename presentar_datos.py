@@ -487,6 +487,8 @@ def guardar_json_resultados(ruta_json,ruta_db,clave_precio,diccionario_resultado
         # saco datos del diccionario
         precio_bat_tipo = get_val(diccionario_resultados["precio_kwh_tipo"])
         capacidad_bateria = get_val(diccionario_resultados["capacidad_bateria"])
+        porcentaje_bateria_usable = get_val(diccionario_resultados["porcentaje_bateria_usable"])
+        capacidad_bateria_usable = get_val(diccionario_resultados["capacidad_bateria_usable"])
         resultado = get_val(diccionario_resultados["costo_total_con_bateria"])
         demanda_bateria = get_val(diccionario_resultados["vector_demanda_bateria"])
         demanda_casa = get_val(diccionario_resultados["demanda_casa"])
@@ -506,6 +508,8 @@ def guardar_json_resultados(ruta_json,ruta_db,clave_precio,diccionario_resultado
         datos[clave_precio] = {
             "Precio kWh": precio_bat_tipo,
             "Capacidad Bateria": capacidad_bateria,
+            "Porcentaje Bateria Usable": porcentaje_bateria_usable,
+            "Capacidad Bateria Usable": capacidad_bateria_usable,
             "Costo Total con Bateria": resultado,
             "Costo Total sin Bateria": costo_sin_bateria,
             "Ahorro con VS sin en periodo": ahorro,
@@ -522,6 +526,8 @@ def guardar_json_resultados(ruta_json,ruta_db,clave_precio,diccionario_resultado
         print("\n\n=====  RESULTADOS OBTENIDOS:  =====")
         print("Precio del kWh en este ciclo:", precio_bat_tipo)
         print("Capacidad óptima de la batería:", capacidad_bateria)
+        print("Profundidad del ciclo (porcentaje usable de la bateria):", porcentaje_bateria_usable)
+        print("Capacidad usable óptima de la batería:", capacidad_bateria_usable)
         print("Costo total minimizado (con batería de pago):", resultado)
         print("Precio que 'generaron' los paneles:", precio_paneles)
         print("Costo total (sin batería y sin paneles):", costo_sin_bateria_y_sin_paneles)
@@ -541,6 +547,8 @@ def guardar_json_resultados(ruta_json,ruta_db,clave_precio,diccionario_resultado
         print("\n\n=====  RESULTADOS OBTENIDOS:  =====")
         print("Precio del kwh en este ciclo: ", diccionario_resultados["Precio kWh"])
         print("Capacidad óptima de la batería:",  diccionario_resultados["Capacidad Bateria"])
+        print("Profundidad del ciclo (porcentaje usable de la bateria):", diccionario_resultados["Porcentaje Bateria Usable"])
+        print("Capacidad usable óptima de la batería:", diccionario_resultados["Capacidad Bateria Usable"])
         print("Costo total minimizado (con bateria pagada):",  diccionario_resultados["Costo Total con Bateria"])
         print("Costo total (sin batería):", diccionario_resultados["Costo Total sin Bateria"])
         print("Ahorro con bateria VS sin bateria en periodo (1year default):", diccionario_resultados["Ahorro con VS sin en periodo"])
