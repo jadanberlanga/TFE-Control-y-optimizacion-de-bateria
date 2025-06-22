@@ -509,9 +509,7 @@ def problema_rango_precios(datos,parametros,ruta_output_json,ruta_output_db,paso
     \n    - `"Capacidad"`: se fija la capacidad de batería y se optimiza el ciclo. Util para un calculo mas directo, con una bateria concreta, como de rentable es mi situacion? ¿deberia comprar mas baterias incluso?
 
     \nReturns:
-    \n- np.ndarray
-    \n    - Vector de resultados con las capacidades de batería obtenidas para cada iteración.
-    \n    - Cada posición del array corresponde a un valor de precio/capacidad usado.
+    \n- np.ndarray, Vector de resultados con las capacidades de batería obtenidas para cada iteración.
     """
 
 

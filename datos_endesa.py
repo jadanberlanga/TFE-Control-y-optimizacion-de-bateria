@@ -4,8 +4,20 @@ import os
 
 
 def cargar_datos_csv_edistribucion(nombre):
-    #descargo los datos de edistribucion>zona privada https://zonaprivada.edistribucion.com/areaprivada/
-    #en nombre viene el nombre de archivo+ruta
+    """
+    \nCarga y normaliza un archivo CSV descargado desde e-distribución (edistribucion>zona privada https://zonaprivada.edistribucion.com/areaprivada/),
+devolviendo una tabla con 1 fila por día y 24 columnas horarias (`H1` a `H24`), más la fecha (`DATE`).
+
+    \nCarga el CSV y toma las columnas 'Fecha', 'Hora', 'AE_kWh', luego convierte fechas a datetime y ordena por día/hora.
+Tambien gestiona los cambios de hora, que e-distrucion los gestiona no gestionandolos: interpola días de 23h y elimina la hora sobrante en días de 25h.
+Por ultimo renombra columnas a H1–H24 y deja `DATE` como columna de fecha para estandarizar con el formato omie que usare luego
+
+    \nParámetros:
+    \n- nombre : str, ruta al archivo CSV descargado desde e-distribución.
+
+    \nReturns:
+    \n- pd.DataFrame con consumos en kWh, formato estándar corto, 1 dia por fila, y columnas de fecha (DATE) y H1-H24
+    """
 
     columnas_deseadas = ['Fecha', 'Hora', 'AE_kWh']
     filas_a_omitir = range(0)   #por si tiene encabezado. No es el caso en este excel
@@ -48,6 +60,20 @@ def cargar_datos_csv_edistribucion(nombre):
     return tabla_normal
 
 def purgar_datos(df):
+    """
+    \nElimina las últimas filas de un DataFrame horario si terminan con ceros (en la hora H24),
+caso típico cuando e-distribución aún no ha subido datos reales y pone 0.0 como placeholder.
+Recorre el DataFrame desde el final, eliminando filas mientras la última columna (H24) tenga valor 0.0.
+Al encontrar un valor distinto en la H24 podemos dar esa fila entera por valida ya, y se detiene.
+Solo purga el final del conjunto, nunca en medio, no es una validacion de datos, solo recorto los no validos
+
+    \nParámetros:
+    \n- df : pd.DataFrame, tabla de consumo horario con columnas H1–H24.
+
+    \nReturns:
+    \n- pd.DataFrame sin las filas finales vacías.
+    """
+
     #para el final edistribucion empieza a tirar 0.0, eso no me sirve, purgo filas
 
     #la idea es ir mirando las horas 24 desde el final, si es 0.0 esa fila entera esta comprometida
@@ -60,13 +86,19 @@ def purgar_datos(df):
     return df
 
 def decidir_nombre_edistri(df,nombre_archivo_base):
-    #le voy a pasar una tabla con fechas ordenadas. Quiero que con un nombre base, le pongo un sufijo con fechas para identificar mejor
+    """
+    \nGenera un nuevo nombre de archivo basado en el nombre base que le pase (`nombre_archivo_base`) y el rango de fechas de la tabla `df`.
+Busca la primera y última fecha de la columna `DATE`, las convierte a string legible (dd-mm-yyyy), y las añade como sufijo a la base.
+Esto asegura y ayuda a identificar el rango de días cubiertos por los datos, estando ya en el titulo del archivo.
 
+    \nParámetros:
+    \n- df : pd.DataFrame con columna `"DATE"` en formato datetime, usada para obtener fechas de inicio y fin.
+    \n- nombre_archivo_base : str, nombre base del archivo, con extensión incluida (normalmente `"Datos_Edistribucion.csv"`).
+
+    \nReturns:
+    \n- str, nuevo nombre de archivo con sufijo de fechas, ej. `"datos_01-01-2023_a_31-01-2023.csv"`.
     """
-    # Obtener la fecha inicial y final del DataFrame
-    fecha_inicio = df.index.min()  # Primera fecha (mínima en el índice)
-    fecha_fin = df.index.max()  # Última fecha (máxima en el índice)
-    """
+
     # Obtener la fecha inicial y final del DataFrame desde la columna DATE
     fecha_inicio = df["DATE"].min()
     fecha_fin = df["DATE"].max()
@@ -85,7 +117,25 @@ def decidir_nombre_edistri(df,nombre_archivo_base):
     return nombre
 
 def crear_nuevo_archivo_edistribucion_historicos(ruta_archivo_input,nombre_archivo_base, ruta_carpeta_output):
-    #basicamente es una subrutina juntaod estas funciones
+    """
+    \nCarga, purga y guarda un archivo CSV descargado desde e-distribución, dejándolo listo para uso posterior.
+Es una subrutina que combina varias funciones de este archivo, que estandariza y preparar datos horarios descargados de la zona privada de
+e-distribución (https://zonaprivada.edistribucion.com/areaprivada/).
+
+    \nFlujo:
+    \n1) Carga datos desde `ruta_archivo_input` con `cargar_datos_csv_edistribucion()`.
+    \n2) Elimina posibles filas finales con ceros (datos incompletos) usando `purgar_datos()`.
+    \n3) Genera un nombre final que incluye el rango de fechas del archivo con `decidir_nombre_edistri()`.
+    \n4) Guarda el archivo limpio en `ruta_carpeta_output`, separado por tabuladores (`sep='\\t'`).
+
+    \nParámetros:
+    \n- ruta_archivo_input : str, ruta al CSV original descargado desde e-distribución.
+    \n- nombre_archivo_base : str, nombre base con extensión, para generar el nombre final con fechas.
+    \n- ruta_carpeta_output : str, carpeta destino donde guardar el archivo limpio.
+
+    \nReturns:
+    \n- str, ruta completa del archivo exportado.
+    """
 
     #cargo los ratos del archivo de edistribucion. Ya es una tabla
     datosTotal = cargar_datos_csv_edistribucion(ruta_archivo_input)
@@ -104,7 +154,8 @@ def crear_nuevo_archivo_edistribucion_historicos(ruta_archivo_input,nombre_archi
     return ruta_archivo_output
 
 def crear_nuevo_archivo_edistribucion_futuros(fecha_ini_scrap, fecha_fin_scrap,fecha_ini_nombre, fecha_fin_nombre, nombre_archivo_base_datos,nombre_archivo_base_fuentes, ruta_carpeta_output,df_datos_scrapeados_previos,formato="%d-%m-%y"):
-    """esto no lo puedo automatizar. Lo dejare como estrucctura por simetria, peor solo marcare todos los datos como AGenerar y ya"""
+    """ESTA FUNCION NO ESTA HECHA, NI SE PODRA HACER, SOLO ESTA AQUI DE PLACEHOLDER CON LA ESTRUCCTURA GENERAL POR SI EN UN FUTURO CAMBIA LA ENTRADA DE DATOS
+    esto no lo puedo automatizar. Lo dejare como estrucctura por simetria, peor solo marcare todos los datos como AGenerar y ya"""
 
     #usando la libreria de pysolar me saco las irradancias. Luego de eso es crrar el archivo con formato similar al resto
 

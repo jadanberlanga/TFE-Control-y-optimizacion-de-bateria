@@ -98,8 +98,10 @@ Genera un archivo de datos con valores reales o pendientes, y su correspondiente
     fecha_ini_scrap = None
     fecha_fin_scrap = None
 
+    #WARNING, ESTA FUNCION EN REALIDAD NO ESTA HECHA, SOLO ESTA AQUI DE PLACEHOLDER
     ruta_consumos_presente_datos, ruta_consumos_presente_fuente = endesa.crear_nuevo_archivo_edistribucion_futuros(fecha_ini_scrap,fecha_fin_scrap,fecha_ini.strftime(formato),
     fecha_fin.strftime(formato),nombre_archivo_output_base_presente_datos,nombre_archivo_output_base_presente_fuente,carpeta,df_datos_scrapeados_previos,formato=formato)
+    ruta_consumos_presente_datos, ruta_consumos_presente_fuente = None,None #OVERRIDE DE CUALQUIER COSA QUE HAYA DADO ESA FUNCION INCOMPLETA
     # esto habra creado un archivo con todas las fechas que ha podido sacar. Desde el fin hasta la fecha ahora es trabajo de la IA. Marcare esos datos faltantes como 0.
     # para no confundir estos 0 con 0 reales los marcare en el gemelo de fuentes de este archivo. ya le tocara a la IA trabajar, no aun.
 
