@@ -10,6 +10,42 @@ import warnings
 
 
 def obtener_irradiancia(latitud,longitud,altura_metros,zona_horaria_str,dateIni_str, dateEnd_str,formato="%d-%m-%y"):
+    """
+    \nCalcula la irradiancia directa horaria en un punto geográfico dado (latitud, longitud, altitud) durante un rango de fechas.
+La irradiancia se estima con `pysolar`, que usa modelos astronómicos para calcular la posición del sol y su irradiancia directa.
+La función genera una lista de horas (ya corregidas por zona horaria y localizadas, incluyendo cambios de hora como los de verano/invierno) y para cada una
+calcula la radiación solar directa sobre una superficie horizontal (una aproximacion muy burda de panel solar pero lo suficiente para este calculo).
+
+    \nFlujo:
+    \n1) Corrige el warning de `numpy.datetime64` que lanza `pysolar` (inofensivo pero molesto).
+    \n2) Genera un vector de horas (localizadas a `zona_horaria_str`) desde `dateIni_str` a `dateEnd_str`, con salto de 1 hora.
+    \n3) Para cada hora:
+        - Convierte la hora a UTC (requisito de `pysolar`).
+        - Calcula la altitud solar en esa hora.
+        - Si el sol está por encima del horizonte (altitud > altura_metros), calcula irradiancia directa.
+        - Si no, se considera noche y devuelve irradiancia 0.
+    \n4) Devuelve dos listas: una con las horas (timezone-aware) y otra con sus irradiancias correspondientes.
+
+    \nNotas:
+    \n- Si el rango tiene un único día (mismo inicio y fin), se extiende automáticamente a 24h.
+    \n- Esta función no tiene en cuenta nubosidad ni condiciones atmosféricas locales.
+    \n- Se descartan fechas inválidas con un `try/except` silencioso (por robustez).
+
+    \nParámetros:
+    \n- latitud : float, latitud del punto (en grados decimales, norte positivo).
+    \n- longitud : float, longitud del punto (en grados decimales, este positivo).
+    \n- altura_metros : float, altitud del observador (en metros sobre el nivel del mar).
+    \n- zona_horaria_str : str, zona horaria local (ej. `'Europe/Madrid'`, `'UTC'`, etc.).
+    \n- dateIni_str : str, fecha de inicio del rango en formato string.
+    \n- dateEnd_str : str, fecha de fin del rango en formato string.
+    \n- formato : str, formato de fecha de los strings (por defecto `%d-%m-%y`).
+
+    \nReturns:
+    \n- Tuple[List[datetime], List[float]]:
+        - Lista de `datetime` con las horas del rango (timezone-aware).
+        - Lista de `float` con la irradiancia directa (en W/m²) para cada hora.
+    """
+
     #asqui la libreria tiene ese warning. No afecta a nada pero es molesto, romoe el texto en consola
     warnings.filterwarnings("ignore", message="no explicit representation of timezones available for np.datetime64")
 
@@ -55,6 +91,24 @@ def obtener_irradiancia(latitud,longitud,altura_metros,zona_horaria_str,dateIni_
     return fechas,irradiancias
 
 def crear_df_tabla_irradancias(fechas,irradiancias,falseo=True):
+    """
+    \nConvierte una lista de irradiancias horarias y sus fechas asociadas en un DataFrame con estructura tipo OMIE (formato corto, una fila por día, columnas `H1` a `H24`).
+Es decir, transforma un vector horario en una tabla diaria con 24 columnas horarias por fila. Además, permite aplicar una función de procesamiento posterior (`falseo` o `purga`).
+
+    \nCrea un DataFrame con columnas `"DATE"` e `"Irradiancia"` a partir de los vectores dados y columna auxiliar `"Hora"` para contar las horas por día.
+Aplica un `pivot_table()` para reorganizar los datos con una fila por día y una columna por hora Renombra las columnas como para formato OMIE, y limpio datos erroneos falseasndolos o purgandolos
+Si `falseo=True`, llama a `falseo_datos(df)` (rellena los datos invalidos con una copia de los que esten bien, para el calculo de historicos, puedo aceptar esta imprecision),
+si `falseo=False`, llama a `purga_datos(df)` (borro estos datos invalidos. Si los borro luego debo generarlos de otra forma, debe estar seguido de una funcion de IA o similar).
+
+    \nParámetros:
+    \n- fechas : List[datetime], lista de fechas-hora (timezone-aware o naive, no importa, se usa solo la parte de fecha).
+    \n- irradiancias : List[float], lista de irradiancias en W/m² (una por hora).
+    \n- falseo : bool, si True aplica `falseo_datos()`, si False aplica `purga_datos()`.
+
+    \nReturns:
+    \n- pd.DataFrame con una fila por día y columnas: `"DATE"`, `"H1"`, `"H2"`, ..., `"Hn"` (hasta 24).
+    """
+
     # Voy a juntar las fechas y las irradancias en el mismo archivo
     # primero monto el dataframe con ambos en forma de vector
     df = pd.DataFrame({"DATE": fechas, "Irradiancia": irradiancias})
@@ -99,9 +153,20 @@ def crear_df_tabla_irradancias(fechas,irradiancias,falseo=True):
 
 
 def falseo_datos(df):
-    #es posible que los datos de irradiancia mas recientes tire NaN.
-    #Podriamos tirar error y para el calculo, pero como solar es solo aproximado, aviso, falseo, y continuo
-    #Si tengo un NaN en la hora 24 considero ese dia entero invalido y lo que hago es copiar el ultimo dia con datos validos
+    """
+    \nRellena los días con datos solares inválidos (NaN en la hora H24) copiando el último día válido completo.
+No es lo ideal, pero es solución rápida y aceptable para modelados históricos aproximados donde se prefiere evitar errores por faltantes si no tengo otra foram de obtenerlos,
+sobre tod0 si en comparacion solo falseo unos pocos datos respecto a cientos.
+
+    \nBusca el último día con datos completos de irradiancia (específicamente con valor no nulo en `H24`, si la ultima hora es invalida, descarto el dia entero),
+y luego copia ese conjunto de 24 horas para sustituir cualquier día que tenga `NaN` en `H24` (miro el ultimo dia correcto y relleno hasta el final con ese dia).
+
+    \nParámetros:
+    \n- df : pd.DataFrame, tabla diaria de irradiancia solar con columnas `"DATE"`, `"H1"` a `"H24"`.
+
+    \nReturns:
+    \n- pd.DataFrame, igual que el original pero con los días inválidos corregidos mediante copia del último día válido.
+    """
 
     #buscar el ultimo dia valido
     ultimo_dia_valido = None
@@ -125,8 +190,18 @@ def falseo_datos(df):
     return df
 
 def purga_datos(df):
-    #es posible que los datos de irradiancia mas recientes tire NaN.
-    #Los purgo, siemplente los borro
+    """
+    Elimina del DataFrame los días con irradiancia inválida (NaN en H24).
+Se asume que un NaN en la hora 24 invalida tod0 el día. Esta función elimina dichas filas por completo.
+    \nPara un funcionamiento correcto y que no de error por falta de dias debe ir seguida por un modulo de IA para completar lo borrado
+
+    \nParámetros:
+    \n- df (pd.DataFrame): DataFrame con columnas 'DATE', 'H1' a 'H24'.
+
+    \nReturns:
+    \n- pd.DataFrame: Mismo DataFrame sin los días incompletos.
+    """
+
 
     # Identificar las filas con NaN en H24
     filas_con_nan = df["H24"].isna()  # Boolean mask para días con NaN en H24
@@ -137,7 +212,21 @@ def purga_datos(df):
     return df
 
 def guardar_irradancias_csv(df,nombre_archivo_base, ruta_carpeta_output):
-    # Obtener la fecha inicial y final del DataFrame
+    """
+    Guarda un DataFrame de irradiancias en un archivo `.csv` con nombre enriquecido con el rango de fechas.
+
+    Extrae la fecha inicial y final del DataFrame (columna `"DATE"`) y las incluye en el nombre del archivo
+en formato `nombre_base_dd-mm-yyyy_a_dd-mm-yyyy.csv`. El archivo se guarda en la ruta indicada, separado por tabulaciones.
+
+    Parámetros:
+    - df (pd.DataFrame): DataFrame con una columna `"DATE"` y datos de irradiancia.
+    - nombre_archivo_base (str): Nombre base del archivo, debe incluir la extensión `.csv`.
+    - ruta_carpeta_output (str): Carpeta donde guardar el archivo.
+
+    Returns:
+    - str: Ruta completa del archivo generado.
+    """
+
     fecha_inicio = df["DATE"].min()
     fecha_fin = df["DATE"].max()
 
@@ -161,7 +250,26 @@ def guardar_irradancias_csv(df,nombre_archivo_base, ruta_carpeta_output):
 
 
 def crear_nuevo_archivo_solar_historicos(latitud,longitud,altura_metros,zona_horaria,fecha_ini, fecha_fin, nombre_archivo_base, ruta_carpeta_output,formato="%d-%m-%y"):
-    #usando la libreria de pysolar me saco las irradancias. Luego de eso es crrar el archivo con formato similar al resto
+    """
+    Genera un nuevo archivo `.csv` con irradiancias solares históricas para una ubicación y rango de fechas dados.
+
+    Utiliza `pysolar` (a través de `obtener_irradiancia`) para calcular la irradiancia horaria, transforma los datos
+en formato diario tipo OMIE (una fila por día, columnas H1 a H24), y guarda el resultado como archivo `.csv` con nombre enriquecido con el rango de fechas.
+
+    Parámetros:
+    - latitud (float): Latitud del lugar en grados decimales.
+    - longitud (float): Longitud del lugar en grados decimales.
+    - altura_metros (float): Altura sobre el nivel del mar en metros.
+    - zona_horaria (str): Zona horaria (ej. "Europe/Madrid").
+    - fecha_ini (str): Fecha de inicio (según formato).
+    - fecha_fin (str): Fecha de fin (según formato).
+    - nombre_archivo_base (str): Nombre base del archivo de salida, debe incluir `.csv`.
+    - ruta_carpeta_output (str): Carpeta donde guardar el archivo.
+    - formato (str): Formato de fecha de entrada (por defecto `"%d-%m-%y"`).
+
+    Returns:
+    - str: Ruta completa del archivo `.csv` generado.
+    """
 
     print("Creando archivo de datos solares, obteniendo irradancias ...")
     fechas,irradiancias = obtener_irradiancia(latitud,longitud,altura_metros,zona_horaria,fecha_ini,fecha_fin,formato=formato)
@@ -172,7 +280,53 @@ def crear_nuevo_archivo_solar_historicos(latitud,longitud,altura_metros,zona_hor
 
 
 def crear_nuevo_archivo_solar_futuros(latitud,longitud,altura_metros,zona_horaria,fecha_ini_scrap, fecha_fin_scrap,fecha_ini_nombre, fecha_fin_nombre, nombre_archivo_base_datos,nombre_archivo_base_fuentes, ruta_carpeta_output,df_datos_scrapeados_previos,formato="%d-%m-%y"):
-    #usando la libreria de pysolar me saco las irradancias. Luego de eso es crrar el archivo con formato similar al resto
+    """
+    \nGenera y guarda dos archivos `.csv` con irradiancias solares futuras y sus fuentes.
+    A partir de un rango de fechas y datos previos scrap, esta función construye tablas diarias
+    de irradiancia y metadatos de fuente de dichos datos (Real o AGenerar), luego completa huecos y las almacena.
+
+    \nFlujo:
+    \n1) Determina fechas de scrap (`fecha_ini_scrap`/`fecha_fin_scrap`) o usa las de nombre si son None.
+    \n2) Llama a `obtener_irradiancia(...)` para obtener listas de `fechas` e `irradiancias`.
+    \n3) Transforma el vector horario en tabla diaria (`H1`–`H24`) con `crear_df_tabla_irradancias(falseo=False).
+    Ya que esto ira a IA puedo y quiero desactivar el falseo y activar la purga de datos invalidos`.
+    \n4) Si `df_datos_scrapeados_previos` existe:
+       - Convierte `DATE` a datetime en ambos DataFrames.
+       - Elimina columnas vacías.
+       - Concatena, elimina duplicados (`keep="last"`), y ordena por `DATE`.
+    \n5) Crea DataFrame de fuentes:
+       - Misma columna `DATE`, columnas `H1`–`H24` con valor `"Real"`.
+    \n6) Rellena días faltantes hasta `fecha_fin_scrap`:
+       - Añade a `df_irradancias` bloques de 24 ceros.
+       - Añade a `df_irradancias_fuentes` bloques de 24 `"AGenerar"`.
+    \n7) Ordena ambos DataFrames por fecha.
+    \n8) Construye nombres:
+       ```
+       {nombre_base_datos}_{dd-mm-YYYY}_a_{dd-mm-YYYY}.csv
+       {nombre_base_fuentes}_{dd-mm-YYYY}_a_{dd-mm-YYYY}.csv
+       ```
+    \n9) Guarda los archivos en `ruta_carpeta_output` (separados por tabulaciones).
+
+    \nParámetros:
+    \n- latitud (float): Latitud en grados decimales.
+    \n- longitud (float): Longitud en grados decimales.
+    \n- altura_metros (float): Altura en metros sobre el nivel del mar.
+    \n- zona_horaria (str): Zona horaria (e.g. `"Europe/Madrid"`).
+    \n- fecha_ini_scrap (datetime or None): Fecha inicio scrap; si None, usa `fecha_ini_nombre`.
+    \n- fecha_fin_scrap (datetime or None): Fecha fin scrap; si None, usa `fecha_fin_nombre`.
+    \n- fecha_ini_nombre (datetime): Fecha inicio para nombre de archivo.
+    \n- fecha_fin_nombre (datetime): Fecha fin para nombre de archivo.
+    \n- nombre_archivo_base_datos (str): Nombre base `.csv` de datos.
+    \n- nombre_archivo_base_fuentes (str): Nombre base `.csv` de fuentes.
+    \n- ruta_carpeta_output (str): Carpeta destino.
+    \n- df_datos_scrapeados_previos (pd.DataFrame or None): Datos previos a fusionar.
+    \n- formato (str): Formato de fecha (`"%d-%m-%y"` por defecto).
+
+    \nReturns:
+    \n- Tuple[str, str]:
+      - Ruta completa del archivo de datos.
+      - Ruta completa del archivo de fuentes.
+    """
 
     print("Creando archivo de datos solares, obteniendo irradancias ...")
 
@@ -292,8 +446,31 @@ def crear_nuevo_archivo_solar_futuros(latitud,longitud,altura_metros,zona_horari
     return ruta_archivo_output_datos, ruta_archivo_output_fuentes
 
 def buscar_datos_scrapeados(ruta_datos_parcial,ruta_fuentes_parcial,carpeta, fecha_ini,fecha_fin, formato="%Y-%m-%d"):
-    '''Partimos de cierta info para hacer scrap, que sera el caso mas normal. La idea sera recuperar la info real que ya tenemos para no tener que volver a scrapearla.
-    Si bien seria mas facil solo scrapear tod0 de 0, primero mas lento e ineficiente, segundo pasado un tiempo el volumen que scrapeariamos seria tan grande que Omie podria bloquear la IP y clasificar el script como malicioso.'''
+    """
+    \nLee archivos previos de datos y fuentes de irradancias (parciales), identifica qué días ya tienen datos reales y cuáles deben generarse,
+y devuelve tanto el rango de fechas a generar como el subconjunto de datos reales ya existentes.
+El estado normal sera tener ya cierta informacion, es ineficiente pararse a obtenerla  otra vez si bien puede ser mas sencillo, solo obtengo la info que no tenga.
+
+    \nFlujo:
+    \n1) Carga el archivo de fuentes y clasifica las filas como `"Real"` o `"AGenerar"` en base a las columnas H1–H24.
+    \n2) Recupera el archivo de datos asociado, filtra las filas reales según las fechas detectadas.
+    \n3) Calcula las fechas a generar ajustadas al rango explícito pedido (`fecha_ini`, `fecha_fin`).
+    \n4) Borra los dos archivos originales, ya que se generarán unos nuevos actualizados.
+
+    \nParámetros:
+    \n- ruta_datos_parcial : str, nombre del archivo de datos parciales (con extensión, sin carpeta).
+    \n- ruta_fuentes_parcial : str, nombre del archivo de fuentes parciales (con extensión, sin carpeta).
+    \n- carpeta : str, ruta donde están los archivos.
+    \n- fecha_ini : str, fecha mínima del rango deseado.
+    \n- fecha_fin : str, fecha máxima del rango deseado.
+    \n- formato : str, formato de las fechas (por defecto `%Y-%m-%d`).
+
+    \nReturns:
+    \n- Tuple[datetime, datetime, pd.DataFrame or None]:
+        - fecha_ini_a_generar : datetime, inicio del rango a generar.
+        - fecha_fin_a_generar : datetime, fin del rango a generar.
+        - df_datos_previos : pd.DataFrame con datos reales ya disponibles, o None si no hay ninguno.
+    """
 
     #print("funcion omie parcial")
     #print(ruta_datos_parcial)
@@ -386,7 +563,23 @@ def buscar_datos_scrapeados(ruta_datos_parcial,ruta_fuentes_parcial,carpeta, fec
     return ini_generar,fin_generar,df_datos_previos
 
 def datos_solar_df(ruta_archivo):
-    # vamos a devolver la lista de excels en formato df de pandas, mas comodo de usar
+    """
+    \nCarga un archivo `.csv` con irradancias horarias. Si el archivo no existe, extrae la información
+necesaria del nombre del archivo (fechas y nombre base) y lanza la funcion para crearlo automáticamente
+(aunque en una ejecucion lineal desde el main el hecha de que exista la ruta es por que ya se ha creado el archivo y se hay guardado su ruta, no se deberia entrar a esta cracion desde aqui).
+
+    \nFlujo:
+    \n1) Comprueba si el archivo existe. Si sí, lo carga como DataFrame.
+    \n2) Si no existe, extrae del nombre del archivo las fechas y nombre base.
+    \n3) Llama a `crear_nuevo_archivo_solar_historicos()` para generarlo.
+    \n4) Una vez generado o encontrado, lo carga como DataFrame y lo devuelve.
+
+    \nParámetros:
+    \n- ruta_archivo : str, ruta completa al archivo `.csv` esperado (debería tener formato `nombre_dd-mm-yyyy_a_dd-mm-yyyy.csv`).
+
+    \nReturns:
+    \n- pd.DataFrame con los datos horarios ya normalizados, listos para uso directo.
+    """
 
     # Verifica si el archivo existe. Si existe usa esos datos_input. Si no cargalos con la funcion
     if os.path.exists(ruta_archivo):
@@ -439,30 +632,38 @@ def datos_solar_df(ruta_archivo):
     return df_solar
 
 
-def calculo_paneles(parametros_json,irradancias_df):
-    """voy a pasarle unas irradancias solares y a prtir de unos datos de los paneels solares instalados saco la potencia util que me dan.
-    Pero sera un calculo muy sencillo, aplicar un % de eficiencia y ya. Lo meto en funcion para margen de update a futuro."""
-
-    """    
-    with open("DatosPython/Parametros.json", "r") as f:
-        config = json.load(f)
+def calculo_paneles(parametros_json,irradancias_vector):
     """
+    \nTodo este archivo se ha estado trabajando con irracancias, que si bien es el dato clave que teng oque obtener, no es el dato que voy a usar.
+En su lugar quiero la potencia solar que obtengo en funcion de la irradancia y los datos de los paneles solares del usuario.
 
+\nLa irradancia son W/m2, la potencia son kW. El primer paso es meter la eficiencia de los paneles, solo uso un % de la irradancia solar total.
+Segundo es ver cuantos m2 de paneles solares hay instalados, con eso ya tengo un dato de W. Solo que no estoy buscando W pero kW, conversion trivial.
+Por ultimo compruebo que no supero los limites de generacion maxima de los paneles
+
+
+    \nParámetros:
+    \n- parametros : dict, JSON ya cargado con configuración general (incluida la info de los paneles solares del usuario).
+    \n- irradancias_vector : vector con las irradancias que ya he obtenido prevuiamente en otras funciones de este archivo (es un vector asi que obtiene del formato largo de df)
+
+    \nReturns:
+    \n- vector con el mismo formato que irradancias_vector, solo que ahora contiene datos de kW de potencia solar
+    """
 
     eficiencia = parametros_json["param_solares"]["eficiencia_%"] / 100  #viene en %, paso a decimal /100
     paneles_m2 = parametros_json["param_solares"]["paneles_m2"]          #m2 de paneles solares. La irradancia son w/m2, con esto w
     potencia_max_w_m2 = parametros_json["param_solares"]["potencia_max_w_m2"]  # potencia maxima del panel en w/m2. Da igual si tengo mas irradancia, el panel no da mas
 
     # Aplicar eficiencia a la Irradiancia
-    irradancias_df = irradancias_df * eficiencia    #w/m2 utiles
-    irradancias_df = irradancias_df * paneles_m2    #w utiles
-    irradancias_df = irradancias_df / 1000          #kw utiles
+    irradancias_vector = irradancias_vector * eficiencia    #w/m2 utiles
+    irradancias_vector = irradancias_vector * paneles_m2    #w utiles
+    irradancias_vector = irradancias_vector / 1000          #kw utiles
 
     potencia_max_kw = potencia_max_w_m2 * paneles_m2 / 1000 #kw max que generan los paneles
 
-    irradancias_df = irradancias_df.clip(upper=potencia_max_kw)
+    irradancias_vector = irradancias_vector.clip(upper=potencia_max_kw)
 
-    return irradancias_df
+    return irradancias_vector
 
 
 

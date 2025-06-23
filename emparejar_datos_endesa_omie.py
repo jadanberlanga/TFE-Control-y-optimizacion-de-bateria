@@ -252,7 +252,7 @@ Es la funcion principal de este archivo.
         df_merged['Demanda'] = df_merged['Demanda'] * multiplicador_demandas
 
         #tambien calculo la potencia que obtienen los paneles de esa irradancia solar
-        df_merged["Irradiancia"] = solar.calculo_paneles(parametros_json,df_merged["Irradiancia"])
+        df_merged["Irradiancia"] = solar.calculo_paneles(parametros_json, df_merged["Irradiancia"])
 
     # de paso me renombro la columna de irradancia a PotenciaSolar (creo una nueva y borro la antigua)
     df_merged["PotenciaSolar"] = df_merged["Irradiancia"]

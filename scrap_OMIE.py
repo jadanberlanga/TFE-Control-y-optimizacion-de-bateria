@@ -18,6 +18,25 @@ from requests import Response
 original_get_data_from_response = MarginalPriceFileReader.get_data_from_response
 
 def patched_get_data_from_response(self, response: Response) -> pd.DataFrame:
+    """
+    \nParche del mét0do `get_data_from_response` del lector de precios OMIE (`MarginalPriceFileReader`) para evitar un warning
+(funciona bien pero es molesto, y ademas avisa que puede no ser solo un warning en el futuro, futureproof).
+    \nConcretamente: "FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated.
+In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes.
+To retain the old behavior, exclude the relevant entries before the concat operation".
+    \nEn lugar de concatenar cada resultado sobre el DataFrame principal, acumula los válidos en una lista y concatena al final.
+Tqambien filtra respuestas vacías o con columnas completamente nulas.
+Acumula líneas válidas en una lista de diccionarios y construye el DataFrame final al acabar.
+Filtra también líneas sin datos (tod0 NaN), evitando añadir basura.
+
+    \nParámetros:
+    \n- self : instancia del lector.
+    \n- response : objeto `Response` con el texto plano de OMIE.
+
+    \nReturns:
+    \n- pd.DataFrame con los datos procesados y columnas estándar.
+    """
+
     res_data = []  # Lista para acumular diccionarios
 
     # Extraemos líneas del texto de la respuesta
@@ -63,6 +82,22 @@ MarginalPriceFileReader.get_data_from_response = patched_get_data_from_response
 original_read_to_dataframe = OMIEDataImporterFromResponses.read_to_dataframe
 
 def patched_read_to_dataframe(self, verbose=False) -> pd.DataFrame:
+    """
+    \nParche del mét0do `read_to_dataframe` para mejorar robustez al importar datos OMIE para evitar un warning
+(funciona bien pero es molesto, y ademas avisa que puede no ser solo un warning en el futuro, futureproof).
+    \nConcretamente: "FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated.
+In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes.
+To retain the old behavior, exclude the relevant entries before the concat operation".
+    \nEn lugar de concatenar cada resultado sobre el DataFrame principal, acumula los válidos en una lista y concatena al final.
+También filtra respuestas vacías o con columnas completamente nulas.
+
+    \nParámetros:
+    \n- verbose : bool, si True imprime el estado de cada URL procesada.
+
+    \nReturns:
+    \n- pd.DataFrame con todos los datos válidos concatenados.
+    """
+
     dataframes = []  # Lista para acumular los DataFrames válidos
 
     for response in self.fileDownloader.url_responses(date_ini=self.date_ini,
@@ -97,6 +132,24 @@ OMIEDataImporterFromResponses.read_to_dataframe = patched_read_to_dataframe
 
 
 def omie_scrap(dateIni_str, dateEnd_str,formato="%d-%m-%y"):
+    """
+    \nDescarga y procesa precios marginales diarios desde la web del OMIE en el rango indicado,
+devolviendo un DataFrame ordenado con precios solo de España (`PRICE_SPAIN`).
+
+    \nInternamente instancia un `OMIEMarginalPriceFileImporter`, descarga los datos por fecha, filtra por el concepto español y
+elimina la columna `CONCEPT`, ya que no se necesita para el análisis.
+
+\nCodigo sacado directamente de la libreria de https://github.com/acruzgarcia/OMIEData
+
+    \nParámetros:
+    \n- dateIni_str : str, fecha de inicio en formato string (por defecto `%d-%m-%y`).
+    \n- dateEnd_str : str, fecha de fin en formato string (por defecto `%d-%m-%y`).
+    \n- formato : str, formato de fecha para interpretar las cadenas (opcional, por defecto `%d-%m-%y`).
+
+    \nReturns:
+    \n- pd.DataFrame con columnas: `"DATE"`, `"H1"` a `"H24"`, solo con los precios de España, ordenado por fecha.
+    """
+
     date_ini = dt.datetime.strptime(dateIni_str, formato)
     date_end = dt.datetime.strptime(dateEnd_str, formato)
 
@@ -117,6 +170,26 @@ def omie_scrap(dateIni_str, dateEnd_str,formato="%d-%m-%y"):
 
 
 def crear_nuevo_archivo_omie_historicos(fecha_ini, fecha_fin, nombre_archivo_base, ruta_carpeta_output,formato="%d-%m-%y"):
+    """
+    \nDescarga precios históricos de OMIE para un rango de fechas, normaliza los datos horarios (gestión cambios de hora cuando aparecen de días de 23 y 25 horas)
+y guarda el resultado como archivo `.csv` limpio, separado por tabuladores.
+
+    \nFlujo:
+    \n1) Descarga datos usando `omie_scrap()` (basado en la librería de https://github.com/acruzgarcia/OMIEData).
+    \n2) Convierte las columnas horarias a numéricas y aplica interpolación para rellenar días de 23 horas (debido a los cambios de hora en españa).
+    \n3) Elimina columnas sobrantes si un día tiene 25 horas (debido a los cambios de hora en españa).
+    \n4) Genera un nombre de archivo final con sufijo de fechas y guarda el CSV con separador `\\t`.
+
+    \nParámetros:
+    \n- fecha_ini : str, fecha inicial (por defecto en formato `%d-%m-%y`).
+    \n- fecha_fin : str, fecha final (por defecto en formato `%d-%m-%y`).
+    \n- nombre_archivo_base : str, nombre base del archivo con extensión incluida.
+    \n- ruta_carpeta_output : str, ruta donde guardar el archivo limpio.
+    \n- formato : str, formato de entrada de fechas (opcional, por defecto `%d-%m-%y`).
+
+    \nReturns:
+    \n- str, ruta completa del archivo exportado (con fechas añadidas en el nombre como sufijo).
+    """
 
     #empiezo con un scrap "bruto" a omie usando el scrip de git
     df_omie = omie_scrap(fecha_ini, fecha_fin, formato)
@@ -152,7 +225,32 @@ def crear_nuevo_archivo_omie_historicos(fecha_ini, fecha_fin, nombre_archivo_bas
     return ruta_archivo_output
 
 def crear_nuevo_archivo_omie_futuros(fecha_ini_scrap, fecha_fin_scrap,fecha_ini_nombre, fecha_fin_nombre, nombre_archivo_base_datos,nombre_archivo_base_fuentes, ruta_carpeta_output,df_datos_scrapeados_previos,formato="%d-%m-%y"):
-    '''Va a hacer un scrap de tod0 lo que pueda. Lo que no pueda lo pondra a 0 y dira que su fuente debera ser predecida'''
+    """
+    \nDescarga datos futuros del OMIE (rango `fecha_ini_scrap` a `fecha_fin_scrap`) y los combina con datos ya scrapeados previos si existen.
+Luego rellena los días futuros sin datos con ceros y marca su fuente como `"AGenerar"`, para que sean tratados como predicciones a futuro.
+Guarda dos archivos: uno con los datos (`.csv`) y otro con las fuentes por hora  de dichos datos (Real o AGenerar). Luego la funcion de IA u otro forma de generar esos datos
+sabra que tiene que generar y cual es un dato real, el cual no necesita generar.
+
+    \nFlujo:
+    \n1) Descarga precios con `omie_scrap()` y normaliza días de 23/25 horas.
+    \n2) Combina con `df_datos_scrapeados_previos` (si se proporciona), eliminando duplicados y ordenando. Y marca como Real estos datos en el df de fuentes
+    \n3) Rellena huecos futuros (hasta `fecha_fin_scrap`) con 0s (en datos) y `"AGenerar"` (en fuentes).
+    \n4) Genera dos archivos `.csv`: uno de datos y otro de fuentes, con fechas como sufijo en el nombre.
+
+    \nParámetros:
+    \n- fecha_ini_scrap : datetime or None, fecha inicial para scrapear datos (si None, se usa `fecha_ini_nombre`).
+    \n- fecha_fin_scrap : datetime or None, fecha final para scrapear datos (si None, se usa `fecha_fin_nombre`).
+    \n- fecha_ini_nombre : datetime, usada para el nombre del archivo exportado.
+    \n- fecha_fin_nombre : datetime, idem, usada para el nombre del archivo exportado.
+    \n- nombre_archivo_base_datos : str, nombre base para el archivo de datos con extensión.
+    \n- nombre_archivo_base_fuentes : str, nombre base para el archivo de fuentes con extensión.
+    \n- ruta_carpeta_output : str, carpeta donde guardar los archivos exportados.
+    \n- df_datos_scrapeados_previos : pd.DataFrame o None, datos ya obtenidos anteriormente que pueden añadirse.
+    \n- formato : str, formato de fechas en los strings (opcional, por defecto `%d-%m-%y`).
+
+    \nReturns:
+    \n- Tuple[str, str], rutas completas a los dos archivos generados: (datos, fuentes).
+    """
 
     #si no me dice una concreta pues las del nombre (caso mas desfavorable pero no hay datos para mas)
     if fecha_ini_scrap is None:
@@ -286,8 +384,33 @@ def crear_nuevo_archivo_omie_futuros(fecha_ini_scrap, fecha_fin_scrap,fecha_ini_
 
 
 def buscar_datos_scrapeados(ruta_datos_parcial,ruta_fuentes_parcial,carpeta, fecha_ini,fecha_fin, formato="%Y-%m-%d"):
-    '''Partimos de cierta info para hacer scrap, que sera el caso mas normal. La idea sera recuperar la info real que ya tenemos para no tener que volver a scrapearla.
-    Si bien seria mas facil solo scrapear tod0 de 0, primero mas lento e ineficiente, segundo pasado un tiempo el volumen que scrapeariamos seria tan grande que Omie podria bloquear la IP y clasificar el script como malicioso.'''
+    """
+    \nLee archivos previos de datos y fuentes OMIE (parciales), identifica qué días ya tienen datos reales y cuáles deben generarse,
+y devuelve tanto el rango de fechas a generar como el subconjunto de datos reales ya existentes.
+El estado normal sera tener ya cierta informacion, es ineficiente pararse a scrapearla otra vez si bien puede ser mas sencillo. Ademas, como el script que hace scrap a la web de OMIE
+hace una gran cantidad de peticiones, si se hace sin control es posible que los sistemas de proteccion de la propia web tachen el script como un ataque o algo malicioso y
+metan la IP en una black list impidiendo el acceso futuro y dejando el script inservible en esencia (hay metodos de saltarse esto pero son potencialmente ilegales)
+
+    \nFlujo:
+    \n1) Carga el archivo de fuentes y clasifica las filas como `"Real"` o `"AGenerar"` en base a las columnas H1–H24.
+    \n2) Recupera el archivo de datos asociado, filtra las filas reales según las fechas detectadas.
+    \n3) Calcula las fechas a generar ajustadas al rango explícito pedido (`fecha_ini`, `fecha_fin`).
+    \n4) Borra los dos archivos originales, ya que se generarán unos nuevos actualizados.
+
+    \nParámetros:
+    \n- ruta_datos_parcial : str, nombre del archivo de datos parciales (con extensión, sin carpeta).
+    \n- ruta_fuentes_parcial : str, nombre del archivo de fuentes parciales (con extensión, sin carpeta).
+    \n- carpeta : str, ruta donde están los archivos.
+    \n- fecha_ini : str, fecha mínima del rango deseado.
+    \n- fecha_fin : str, fecha máxima del rango deseado.
+    \n- formato : str, formato de las fechas (por defecto `%Y-%m-%d`).
+
+    \nReturns:
+    \n- Tuple[datetime, datetime, pd.DataFrame or None]:
+        - fecha_ini_a_generar : datetime, inicio del rango a generar.
+        - fecha_fin_a_generar : datetime, fin del rango a generar.
+        - df_datos_previos : pd.DataFrame con datos reales ya disponibles, o None si no hay ninguno.
+    """
 
     #print("funcion omie parcial")
     #print(ruta_datos_parcial)
@@ -324,15 +447,6 @@ def buscar_datos_scrapeados(ruta_datos_parcial,ruta_fuentes_parcial,carpeta, fec
 
     # Si en algún grupo solo hay un día, tanto el inicio como el fin serán ese mismo día.
     # Por ejemplo, si df_reales tiene solo una fila, entonces ini_reales y fin_reales serán iguales.
-
-    """
-    print("Fechas reales:")
-    print("Inicio:", ini_reales)
-    print("Fin   :", fin_reales)
-    print("Fechas a generar:")
-    print("Inicio:", ini_generar)
-    print("Fin   :", fin_generar)
-    """
 
 
     #con eso clasificado ahora filtramos los datos que son reales
@@ -381,7 +495,23 @@ def buscar_datos_scrapeados(ruta_datos_parcial,ruta_fuentes_parcial,carpeta, fec
 
 
 def datos_omie_df(ruta_archivo):
-    # vamos a devolver la lista de excels en formato df de pandas, mas comodo de usar
+    """
+    \nCarga un archivo `.csv` con precios horarios de OMIE. Si el archivo no existe, extrae la información
+necesaria del nombre del archivo (fechas y nombre base) y lanza el scrap para crearlo automáticamente
+(aunque en una ejecucion lineal desde el main el hecha de que exista la ruta es por que ya se ha creado el archivo y se hay guardado su ruta, no se deberia entrar a este scrap desde aqui).
+
+    \nFlujo:
+    \n1) Comprueba si el archivo existe. Si sí, lo carga como DataFrame.
+    \n2) Si no existe, extrae del nombre del archivo las fechas y nombre base.
+    \n3) Llama a `crear_nuevo_archivo_omie_historicos()` para generarlo.
+    \n4) Una vez generado o encontrado, lo carga como DataFrame y lo devuelve.
+
+    \nParámetros:
+    \n- ruta_archivo : str, ruta completa al archivo `.csv` esperado (debería tener formato `nombre_dd-mm-yyyy_a_dd-mm-yyyy.csv`).
+
+    \nReturns:
+    \n- pd.DataFrame con los datos horarios ya normalizados, listos para uso directo.
+    """
 
     # Verifica si el archivo existe. Si existe usa esos datos_input. Si no cargalos con la funcion
     if os.path.exists(ruta_archivo):
