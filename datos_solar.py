@@ -305,7 +305,7 @@ def crear_nuevo_archivo_solar_futuros(latitud,longitud,altura_metros,zona_horari
        {nombre_base_datos}_{dd-mm-YYYY}_a_{dd-mm-YYYY}.csv
        {nombre_base_fuentes}_{dd-mm-YYYY}_a_{dd-mm-YYYY}.csv
        ```
-    \n9) Guarda los archivos en `ruta_carpeta_output` (separados por tabulaciones).
+    \n9) Guarda los archivos en `ruta_carpeta_output`.
 
     \nParámetros:
     \n- latitud (float): Latitud en grados decimales.

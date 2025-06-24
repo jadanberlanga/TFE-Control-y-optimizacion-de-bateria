@@ -7,7 +7,37 @@ from datetime import timedelta
 
 
 def obtener_temperaturas(latitud, longitud, zona_horaria_str, dateIni_str, dateEnd_str, formato="%d-%m-%y"):
-    """obtengo temperaturas historicas con el archivo de open meteo (api)"""
+    """
+    \nObtiene temperaturas horarias históricas desde la API de Open-Meteo (https://open-meteo.com/), para un rango de fechas y una ubicación geográfica concreta.
+Devuelve un vector horario con las temperaturas en grados Celsius.
+
+    \nFlujo:
+    \n1) Genera un vector de horas (`fechas_locales`) entre `dateIni_str` y `dateEnd_str`, localizadas a la zona horaria indicada (corrigiendo cambios de hora, etc.).
+    \n2) Formatea las fechas de inicio y fin en formato `YYYY-MM-DD` (requerido por la API de Open-Meteo).
+    \n3) Lanza una petición GET al endpoint histórico de Open-Meteo, solicitando la variable `"temperature_2m"` a resolución horaria.
+    \n4) Si la respuesta de la API da error (por ejemplo, rango de fechas no válido o mal formateo), lanza una excepción con el código HTTP y el mensaje de error.
+    \n5) Si tod0 va bien, parsea el JSON devuelto y extrae:
+        - `"hourly.time"` → lista de timestamps en string (ISO 8601).
+        - `"hourly.temperature_2m"` → lista de temperaturas horarias en grados Celsius (creo vector de horas, devuelve vector de temperaturas cada hora).
+
+    \nNotas:
+    \n- La API devuelve datos en la zona horaria solicitada (`timezone=zona_horaria_str`), así que localizo y las horas ya vendrán correctamente ajustadas.
+    \n- Este mét0do solo sirve para datos históricos. Para predicción futura (forecast) habría que usar otro endpoint de Open-Meteo.
+
+    \nParámetros:
+    \n- latitud : float, latitud del punto (en grados decimales, norte positivo).
+    \n- longitud : float, longitud del punto (en grados decimales, este positivo).
+    \n- zona_horaria_str : str, string de zona horaria IANA (ej. `'Europe/Madrid'`).
+    \n- dateIni_str : str, fecha de inicio del rango, en formato string (por defecto `%d-%m-%y`).
+    \n- dateEnd_str : str, fecha de fin del rango, en formato string (por defecto `%d-%m-%y`).
+    \n- formato : str, formato de las fechas de entrada (opcional, por defecto `%d-%m-%y`).
+
+    \nReturns:
+    \n- Tuple[List[str], List[float]] →
+        - Lista de strings ISO8601 con los timestamps de cada hora (`fechas_str`).
+        - Lista de floats con las temperaturas horarias (`temperaturas`), en grados Celsius.
+    """
+
     date_ini = dt.datetime.strptime(dateIni_str, formato)
     date_end = dt.datetime.strptime(dateEnd_str, formato)
     zona_horaria = pytz.timezone(zona_horaria_str)
@@ -47,7 +77,38 @@ def obtener_temperaturas(latitud, longitud, zona_horaria_str, dateIni_str, dateE
     return fechas_str, temperaturas
 
 def obtener_prediccion_temperaturas(latitud, longitud, zona_horaria_str, dateIni_str, dateEnd_str, formato="%d-%m-%y"):
-    """obtengo temperaturas futuras con el el forecast de open meteo (api)"""
+    """
+    \nObtiene predicciones de temperatura horaria futura usando el endpoint de `forecast` de Open-Meteo (https://open-meteo.com/), para una ubicación geográfica y un rango de fechas.
+Devuelve un vector de horas y su correspondiente predicción de temperatura en grados Celsius.
+
+    \nFlujo:
+    \n1) Genera un vector de horas (`fechas_locales`) entre `dateIni_str` y `dateEnd_str`, localizadas según la zona horaria indicada (corrigiendo cambio de hora si procede).
+    \n2) Calcula el número total de días de predicción que se necesitan (la API no acepta fechas de inicio/fin sueltas, sino número de días de forecast).
+    \n3) Lanza una petición GET al endpoint `forecast` de Open-Meteo, solicitando la variable `"temperature_2m"` a resolución horaria.
+    \n4) Si la API devuelve un error (por ejemplo, número de días fuera de rango o coordenadas incorrectas), se lanza una excepción mostrando el código de error y el texto devuelto.
+    \n5) Si la respuesta es válida, extrae del JSON:
+        - `"hourly.time"` → lista de strings con timestamps ISO8601 (en la zona horaria pedida).
+        - `"hourly.temperature_2m"` → lista de temperaturas horarias, en grados Celsius (creo vector de horas, devuelve vector de temperaturas cada hora).
+
+    \nNotas:
+    \n- La API de Open-Meteo para forecast **solo admite previsión de futuro cercano (normalmente unos 7-14 días) Ademas "forecast_days" funciona con un int de dias a futuro, resto fechas ini y final.
+    \n- Los datos vienen ya ajustados a la zona horaria (`timezone=zona_horaria_str`), por lo que no hace falta convertir manualmente.
+    \n- Para obtener datos históricos, hay que usar el endpoint `archive`, no este.
+
+    \nParámetros:
+    \n- latitud : float, latitud del punto (en grados decimales, norte positivo).
+    \n- longitud : float, longitud del punto (en grados decimales, este positivo).
+    \n- zona_horaria_str : str, string IANA de zona horaria (ej. `'Europe/Madrid'`).
+    \n- dateIni_str : str, fecha de inicio del rango deseado (en formato string, por defecto `%d-%m-%y`).
+    \n- dateEnd_str : str, fecha de fin del rango deseado (en formato string, por defecto `%d-%m-%y`).
+    \n- formato : str, formato de las fechas de entrada (opcional, por defecto `%d-%m-%y`).
+
+    \nReturns:
+    \n- Tuple[List[str], List[float]] →
+        - Lista de timestamps (strings ISO8601) para cada hora del rango solicitado (`fechas_str`).
+        - Lista de predicciones de temperatura (`temperaturas`), en grados Celsius.
+    """
+
     date_ini = dt.datetime.strptime(dateIni_str, formato)
     date_end = dt.datetime.strptime(dateEnd_str, formato)
     zona_horaria = pytz.timezone(zona_horaria_str)
@@ -85,6 +146,24 @@ def obtener_prediccion_temperaturas(latitud, longitud, zona_horaria_str, dateIni
 
 
 def crear_df_tabla_temperaturas(fechas, temperaturas, falseo=True):
+    """
+    \nConvierte una lista de temperaturas horarias y sus fechas asociadas en un DataFrame con estructura tipo OMIE (formato corto, una fila por día, columnas `H1` a `H24`).
+Es decir, transforma un vector horario en una tabla diaria con 24 columnas horarias por fila. Además, permite aplicar una función de procesamiento posterior (`falseo` o `purga`).
+
+    \nCrea un DataFrame con columnas `"DATE"` y `"Temperatura"` a partir de los vectores dados y columna auxiliar `"Hora"` para contar las horas por día.
+Aplica un `pivot_table()` para reorganizar los datos con una fila por día y una columna por hora. Renombra las columnas como para formato OMIE, y limpia datos erróneos falseándolos o purgándolos.
+Si `falseo=True`, llama a `falseo_datos(df)` (rellena los datos inválidos con una copia de los que estén bien, para el cálculo de históricos, puedo aceptar esta imprecisión),
+si `falseo=False`, llama a `purga_datos(df)` (borro estos datos inválidos. Si los borro luego debo generarlos de otra forma, debe estar seguido de una función de IA o similar).
+
+    \nParámetros:
+    \n- fechas : List[datetime], lista de fechas-hora (timezone-aware o naive, no importa, se usa solo la parte de fecha).
+    \n- temperaturas : List[float], lista de temperaturas en grados Celsius (una por hora).
+    \n- falseo : bool, si True aplica `falseo_datos()`, si False aplica `purga_datos()`.
+
+    \nReturns:
+    \n- pd.DataFrame con una fila por día y columnas: `"DATE"`, `"H1"`, `"H2"`, ..., `"Hn"` (hasta 24).
+    """
+
     # Uno fechas y temperaturas en el mismo DataFrame
     df = pd.DataFrame({"DATE": fechas, "Temperatura": temperaturas})
     # Me aseguro de que la columna "DATE" es datetime y me quedo solo con la parte de la fecha
@@ -111,9 +190,20 @@ def crear_df_tabla_temperaturas(fechas, temperaturas, falseo=True):
     return df_pivot_procesado
 
 def falseo_datos(df):
-    #es posible que los datos de temperaturas mas recientes tire NaN.
-    #Podriamos tirar error y para el calculo, pero como solar es solo aproximado, aviso, falseo, y continuo
-    #Si tengo un NaN en la hora 24 considero ese dia entero invalido y lo que hago es copiar el ultimo dia con datos validos
+    """
+    \nRellena los días con datos de temperatura inválidos (NaN en la hora H24) copiando el último día válido completo.
+No es lo ideal, pero es solución rápida y aceptable para modelados históricos aproximados donde se prefiere evitar errores por faltantes si no tengo otra forma de obtenerlos,
+sobre t0do si en comparación solo falseo unos pocos datos respecto a cientos.
+
+    \nBusca el último día con datos completos de temperatura (específicamente con valor no nulo en `H24`, si la última hora es inválida, descarto el día entero),
+y luego copia ese conjunto de 24 horas para sustituir cualquier día que tenga `NaN` en `H24` (miro el último día correcto y relleno hasta el final con ese día).
+
+    \nParámetros:
+    \n- df : pd.DataFrame, tabla diaria de temperaturas con columnas `"DATE"`, `"H1"` a `"H24"`.
+
+    \nReturns:
+    \n- pd.DataFrame, igual que el original pero con los días inválidos corregidos mediante copia del último día válido.
+    """
 
     #buscar el ultimo dia valido
     ultimo_dia_valido = None
@@ -132,8 +222,18 @@ def falseo_datos(df):
     return df
 
 def purga_datos(df):
-    #es posible que los datos de irradiancia mas recientes tire NaN.
-    #Los purgo, siemplente los borro
+    """
+    \nElimina del DataFrame los días con temperatura inválida (NaN en H24).
+Se asume que un NaN en la hora 24 invalida t0do el día. Esta función elimina dichas filas por completo.
+
+    \nPara un funcionamiento correcto y que no dé error por falta de días debe ir seguida por un módulo de IA para completar lo borrado.
+
+    \nParámetros:
+    \n- df (pd.DataFrame): DataFrame con columnas `"DATE"`, `"H1"` a `"H24"`.
+
+    \nReturns:
+    \n- pd.DataFrame: Mismo DataFrame sin los días incompletos.
+    """
 
     # Identificar las filas con NaN en H24
     filas_con_nan = df["H24"].isna()  # Boolean mask para días con NaN en H24
@@ -145,8 +245,31 @@ def purga_datos(df):
 
 
 def buscar_datos_scrapeados(ruta_datos_parcial,ruta_fuentes_parcial,carpeta, fecha_ini,fecha_fin, formato="%Y-%m-%d"):
-    '''Partimos de cierta info para hacer scrap, que sera el caso mas normal. La idea sera recuperar la info real que ya tenemos para no tener que volver a scrapearla.
-    Si bien seria mas facil solo scrapear tod0 de 0, primero mas lento e ineficiente, segundo pasado un tiempo el volumen que scrapeariamos seria tan grande que Omie podria bloquear la IP y clasificar el script como malicioso.'''
+    """
+    \nLee archivos previos de datos y fuentes de temperaturas (parciales), identifica qué días ya tienen datos reales y cuáles deben generarse,
+y devuelve tanto el rango de fechas a generar como el subconjunto de datos reales ya existentes.
+El estado normal sera tener ya cierta informacion, es ineficiente pararse a obtenerla  otra vez si bien puede ser mas sencillo, solo obtengo la info que no tenga.
+
+    \nFlujo:
+    \n1) Carga el archivo de fuentes y clasifica las filas como `"Real"` o `"AGenerar"` en base a las columnas H1–H24.
+    \n2) Recupera el archivo de datos asociado, filtra las filas reales según las fechas detectadas.
+    \n3) Calcula las fechas a generar ajustadas al rango explícito pedido (`fecha_ini`, `fecha_fin`).
+    \n4) Borra los dos archivos originales, ya que se generarán unos nuevos actualizados.
+
+    \nParámetros:
+    \n- ruta_datos_parcial : str, nombre del archivo de datos parciales (con extensión, sin carpeta).
+    \n- ruta_fuentes_parcial : str, nombre del archivo de fuentes parciales (con extensión, sin carpeta).
+    \n- carpeta : str, ruta donde están los archivos.
+    \n- fecha_ini : str, fecha mínima del rango deseado.
+    \n- fecha_fin : str, fecha máxima del rango deseado.
+    \n- formato : str, formato de las fechas (por defecto `%Y-%m-%d`).
+
+    \nReturns:
+    \n- Tuple[datetime, datetime, pd.DataFrame or None]:
+        - fecha_ini_a_generar : datetime, inicio del rango a generar.
+        - fecha_fin_a_generar : datetime, fin del rango a generar.
+        - df_datos_previos : pd.DataFrame con datos reales ya disponibles, o None si no hay ninguno.
+    """
 
     ruta_datos_parcial =  os.path.join(carpeta,ruta_datos_parcial)
     ruta_fuentes_parcial =  os.path.join(carpeta,ruta_fuentes_parcial)
@@ -221,6 +344,20 @@ def buscar_datos_scrapeados(ruta_datos_parcial,ruta_fuentes_parcial,carpeta, fec
     return ini_generar,fin_generar,df_datos_previos
 
 def guardar_temperaturas_csv(df, nombre_archivo_base, ruta_carpeta_output):
+    """
+    Guarda un DataFrame de temperaturas en un archivo `.csv` con nombre enriquecido con el rango de fechas.
+
+    Extrae la fecha inicial y final del DataFrame (columna `"DATE"`) y las incluye en el nombre del archivo
+en formato `nombre_base_dd-mm-yyyy_a_dd-mm-yyyy.csv`. El archivo se guarda en la ruta indicada, separado por tabulaciones.
+
+    Parámetros:
+    - df (pd.DataFrame): DataFrame con una columna `"DATE"` y datos de temperaturas .
+    - nombre_archivo_base (str): Nombre base del archivo, debe incluir la extensión `.csv`.
+    - ruta_carpeta_output (str): Carpeta donde guardar el archivo.
+
+    Returns:
+    - str: Ruta completa del archivo generado.
+    """
     # Obtener la fecha inicial y final del DataFrame
     fecha_inicio = df["DATE"].min()
     fecha_fin = df["DATE"].max()
@@ -243,7 +380,26 @@ def guardar_temperaturas_csv(df, nombre_archivo_base, ruta_carpeta_output):
 
 
 def crear_nuevo_archivo_temperaturas_historicos(latitud,longitud,zona_horaria,fecha_ini, fecha_fin, nombre_archivo_base, ruta_carpeta_output,formato="%d-%m-%y"):
-    #usando la libreria de pysolar me saco las irradancias. Luego de eso es crrar el archivo con formato similar al resto
+    """
+    Genera un nuevo archivo `.csv` con temperaturas reales históricas para una ubicación y rango de fechas dados.
+
+    Utiliza la api de Open-Meteo de archivos (a través de `obtener_temperaturas`) para calcular la temperatura horaria, transforma los datos
+en formato diario tipo OMIE (una fila por día, columnas H1 a H24), y guarda el resultado como archivo `.csv` con nombre enriquecido con el rango de fechas.
+
+    Parámetros:
+    - latitud (float): Latitud del lugar en grados decimales.
+    - longitud (float): Longitud del lugar en grados decimales.
+    - altura_metros (float): Altura sobre el nivel del mar en metros.
+    - zona_horaria (str): Zona horaria (ej. "Europe/Madrid").
+    - fecha_ini (str): Fecha de inicio (según formato).
+    - fecha_fin (str): Fecha de fin (según formato).
+    - nombre_archivo_base (str): Nombre base del archivo de salida, debe incluir `.csv`.
+    - ruta_carpeta_output (str): Carpeta donde guardar el archivo.
+    - formato (str): Formato de fecha de entrada (por defecto `"%d-%m-%y"`).
+
+    Returns:
+    - str: Ruta completa del archivo `.csv` generado.
+    """
 
     print("Creando archivo de temperaturas, obteniendo temperaturas ...")
     fechas,irradiancias = obtener_temperaturas(latitud,longitud,zona_horaria,fecha_ini,fecha_fin,formato=formato)
@@ -253,7 +409,49 @@ def crear_nuevo_archivo_temperaturas_historicos(latitud,longitud,zona_horaria,fe
     return ruta_archivo_output
 
 def crear_nuevo_archivo_temperaturas_futuros(latitud,longitud,zona_horaria,fecha_ini_scrap, fecha_fin_scrap,fecha_ini_nombre, fecha_fin_nombre, nombre_archivo_base_datos,nombre_archivo_base_fuentes, ruta_carpeta_output,df_datos_scrapeados_previos,formato="%d-%m-%y"):
-    #usando la libreria de pysolar me saco las irradancias. Luego de eso es crrar el archivo con formato similar al resto
+    """
+    \nGenera y guarda dos archivos `.csv` con temperaturas horarias futuras y sus fuentes (Real o AGenerar).
+    A partir de un rango de fechas y datos previos scrap, esta función construye tablas diarias
+    de temperatura y metadatos de fuente de dichos datos, luego completa huecos y las almacena.
+
+    \nFlujo:
+    \n1) Determina fechas de scrap (`fecha_ini_scrap`/`fecha_fin_scrap`) o usa las de nombre si son None.
+    \n2) Llama a `obtener_temperaturas(...)` (Open-Meteo) para obtener listas de `fechas` y `temperaturas`.
+    \n3) Transforma el vector horario en tabla diaria (`H1`–`H24`) con `crear_df_tabla_temperaturas(falseo=False) (se seguira con IA, no quiero falsear, quiero purgar)`.
+    \n4) Si `df_datos_scrapeados_previos` existe:
+       - Convierte `DATE` a datetime en ambos DataFrames.
+       - Elimina columnas vacías.
+       - Concatena, elimina duplicados (`keep="last"`), y ordena por `DATE`.
+    \n5) Copia los últimos valores conocidos para rellenar días recientes no incluidos en la predicción.
+    \n6) Llama a `obtener_prediccion_temperaturas(...)` (Open-Meteo) para añadir las temperaturas futuras.
+    \n7) Crea DataFrame de fuentes:
+       - Misma columna `DATE`, columnas `H1`–`H24` con valor `"Real"`.
+    \n8) Rellena días faltantes hasta `fecha_fin_scrap`:
+       - Añade a `df_temperaturas` bloques de 24 ceros.
+       - Añade a `df_temperaturas_fuentes` bloques de 24 `"AGenerar"`.
+    \n9) Ordena ambos DataFrames por fecha.
+    \n10) Construye nombres, base mas fechas de sufijo.
+    \n11) Guarda los archivos en `ruta_carpeta_output`.
+
+    \nParámetros:
+    \n- latitud (float): Latitud en grados decimales.
+    \n- longitud (float): Longitud en grados decimales.
+    \n- zona_horaria (str)  : Zona horaria local (e.g. "Europe/Madrid").
+    \n- fecha_ini_scrap (datetime|None): Fecha inicio scrap; si None, usa `fecha_ini_nombre`.
+    \n- fecha_fin_scrap (datetime|None): Fecha fin scrap; si None, usa `fecha_fin_nombre`.
+    \n- fecha_ini_nombre (datetime): Fecha inicio para nombre de archivo.
+    \n- fecha_fin_nombre (datetime): Fecha fin para nombre de archivo.
+    \n- nombre_archivo_base_datos (str)  : Nombre base `.csv` de datos de temperatura.
+    \n- nombre_archivo_base_fuentes (str): Nombre base `.csv` de fuentes.
+    \n- ruta_carpeta_output (str)  : Carpeta donde se guardan los archivos.
+    \n- df_datos_scrapeados_previos (pd.DataFrame|None): Datos previos a fusionar.
+    \n- formato (str)  : Formato de fecha (`"%d-%m-%y"` por defecto).
+
+    \nReturns:
+    \n- Tuple[str, str]:
+      - Ruta completa del archivo de datos de temperatura.
+      - Ruta completa del archivo de fuentes de dichos datos.
+    """
 
     print("Creando archivo de temperaturas, obteniendo temperaturas ...")
 
@@ -448,7 +646,27 @@ def crear_nuevo_archivo_temperaturas_futuros(latitud,longitud,zona_horaria,fecha
 
 
 def datos_temperatura_df(ruta_archivo):
-    # vamos a devolver la lista de excels en formato df de pandas, mas comodo de usar
+    """
+    \nCarga un archivo `.csv` con temperaturas horarias. Si el archivo no existe, extrae la información
+    necesaria del nombre del archivo (fechas y nombre base) y lanza la función para crearlo automáticamente
+    (en una ejecución lineal desde el main, el hecho de que exista la ruta indica que el archivo ya se creó,
+    por lo que no debería entrar en este bloque de creación).
+
+    \nFlujo:
+    \n1) Comprueba si el archivo existe. Si sí, lo carga como DataFrame.
+    \n2) Si no existe, extrae del nombre del archivo las fechas y el nombre base.
+    \n3) Llama a `crear_nuevo_archivo_temperaturas_historicos()` (Open-Meteo) para generarlo.
+    \n4) Una vez generado o encontrado, lo carga como DataFrame y lo devuelve.
+
+    \nParámetros:
+    \n- ruta_archivo : str
+      Ruta completa al archivo `.csv` esperado (debería tener formato
+      `nombre_dd-mm-yyyy_a_dd-mm-yyyy.csv`).
+
+    \nReturns:
+    \n- pd.DataFrame
+      DataFrame con las temperaturas horarias ya normalizadas, listo para uso directo.
+    """
 
     # Verifica si el archivo existe. Si existe usa esos datos_input. Si no cargalos con la funcion
     if os.path.exists(ruta_archivo):
