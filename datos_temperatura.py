@@ -17,8 +17,8 @@ Devuelve un vector horario con las temperaturas en grados Celsius.
     \n3) Lanza una petición GET al endpoint histórico de Open-Meteo, solicitando la variable `"temperature_2m"` a resolución horaria.
     \n4) Si la respuesta de la API da error (por ejemplo, rango de fechas no válido o mal formateo), lanza una excepción con el código HTTP y el mensaje de error.
     \n5) Si tod0 va bien, parsea el JSON devuelto y extrae:
-        - `"hourly.time"` → lista de timestamps en string (ISO 8601).
-        - `"hourly.temperature_2m"` → lista de temperaturas horarias en grados Celsius (creo vector de horas, devuelve vector de temperaturas cada hora).
+        - `"hourly.time"`:lista de timestamps en string (ISO 8601).
+        - `"hourly.temperature_2m"`: lista de temperaturas horarias en grados Celsius (creo vector de horas, devuelve vector de temperaturas cada hora).
 
     \nNotas:
     \n- La API devuelve datos en la zona horaria solicitada (`timezone=zona_horaria_str`), así que localizo y las horas ya vendrán correctamente ajustadas.
@@ -33,7 +33,7 @@ Devuelve un vector horario con las temperaturas en grados Celsius.
     \n- formato : str, formato de las fechas de entrada (opcional, por defecto `%d-%m-%y`).
 
     \nReturns:
-    \n- Tuple[List[str], List[float]] →
+    \n- Tuple[List[str], List[float]]:
         - Lista de strings ISO8601 con los timestamps de cada hora (`fechas_str`).
         - Lista de floats con las temperaturas horarias (`temperaturas`), en grados Celsius.
     """
@@ -87,8 +87,8 @@ Devuelve un vector de horas y su correspondiente predicción de temperatura en g
     \n3) Lanza una petición GET al endpoint `forecast` de Open-Meteo, solicitando la variable `"temperature_2m"` a resolución horaria.
     \n4) Si la API devuelve un error (por ejemplo, número de días fuera de rango o coordenadas incorrectas), se lanza una excepción mostrando el código de error y el texto devuelto.
     \n5) Si la respuesta es válida, extrae del JSON:
-        - `"hourly.time"` → lista de strings con timestamps ISO8601 (en la zona horaria pedida).
-        - `"hourly.temperature_2m"` → lista de temperaturas horarias, en grados Celsius (creo vector de horas, devuelve vector de temperaturas cada hora).
+        - `"hourly.time"`: lista de strings con timestamps ISO8601 (en la zona horaria pedida).
+        - `"hourly.temperature_2m"`: lista de temperaturas horarias, en grados Celsius (creo vector de horas, devuelve vector de temperaturas cada hora).
 
     \nNotas:
     \n- La API de Open-Meteo para forecast **solo admite previsión de futuro cercano (normalmente unos 7-14 días) Ademas "forecast_days" funciona con un int de dias a futuro, resto fechas ini y final.
@@ -104,7 +104,7 @@ Devuelve un vector de horas y su correspondiente predicción de temperatura en g
     \n- formato : str, formato de las fechas de entrada (opcional, por defecto `%d-%m-%y`).
 
     \nReturns:
-    \n- Tuple[List[str], List[float]] →
+    \n- Tuple[List[str], List[float]]:
         - Lista de timestamps (strings ISO8601) para cada hora del rango solicitado (`fechas_str`).
         - Lista de predicciones de temperatura (`temperaturas`), en grados Celsius.
     """

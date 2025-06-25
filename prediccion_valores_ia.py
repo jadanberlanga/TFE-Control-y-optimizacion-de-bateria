@@ -17,8 +17,29 @@ from torch.utils.data import DataLoader
 
 
 def comprobacion_hardware_y_modo(parametros):
-    '''Voy a mirar si tengo una grafica y las librerias necesarias para usarla. Si lo tengo la usare de ahora en adelante, si no cpu directo.
-    Tambien mirare si tengo los modelos de IA neceasrios para usar la CPU, si no a CPU con un modelo de prediccion clasico'''
+    """
+    \nRealiza una comprobación del entorno de hardware y de los archivos de modelos de IA necesarios.
+
+    \nFlujo:
+    \n1) Verifica la disponibilidad de hardware compatible con CUDA y la presencia de la librería `torch` (PyTorch):
+        - Si hay GPU + CUDA + PyTorch, activa el modo GPU.
+        - Si falta alguna de esas cosas, automáticamente a CPU.
+    \n2) Comprueba si existen los tres modelos de IA necesarios en disco (rutas proporcionadas en el diccionario de parámetros):
+        - Modelo de demanda (Edistribucion), solar (pysolar) y de precio (OMIE).
+        - Si los tres archivos existen, se activa `tengo_modelos=True`.
+        - Si falta alguno, `tengo_modelos=False` y el sistema usará un predictor clásico (modelo ARIMA).
+
+    \nNotas:
+    \n- No realiza cálculos ni carga modelos aún, solo hace la comprobación de hardware y presencia de archivos.
+
+    \nParámetros:
+    \n- parametros : dict, JSON de configuración ya cargado, que debe contener en su campo `"rutas_modelos_IA"` las rutas de los modelos de demanda, solar y precio.
+
+    \nReturns:
+    \n- Tuple[bool, bool] :
+        - `tengo_gpu`: True si hay GPU + CUDA + PyTorch disponible.
+        - `tengo_modelos`: True si los tres modelos de IA existen en las rutas indicadas.
+    """
 
     #Comprobard hardware
     tengo_gpu = False #modo cpu por defecto, ya cambiere
@@ -50,6 +71,58 @@ def comprobacion_hardware_y_modo(parametros):
 
 
 class ForecastSingleFeatureDataset(Dataset):
+    """
+    \nDataset personalizado de PyTorch para el entrenamiento de modelos de predicción de series temporales horarias (forecast de una sola variable objetivo a 24h vista), usando como input tanto datos del día actual como de los 14 días previos.
+    (el mismo dataset y arquitectura de modelo de IA para las 3 variables, solo paso datos distintos)
+    \nEste dataset genera, para cada muestra:
+    - Una entrada `x` con dos partes:
+        1) Datos del día actual (`canales_dia_actual`), incluyendo codificaciones de fecha, hora y temperatura
+        (tengo todos los datos menos el de la variable objetivo de hoy. En entrenamiento tedre dicho dato pero lo usare para evaluar, no para entrenar).
+        2) Un histórico de los 14 días anteriores (`historico_ordenado`), donde se incluyen las mismas variables, además de la variable objetivo de esos días (es decir, una variable mas, un canal extra, no son compatibles ambas entradas).
+    - Un objetivo `y`: la variable de predicción, ejemplo la demanda eléctrica.
+
+    \nFlujo interno:
+    \n1) El dataset espera como entrada un tensor `entradas` de tamaño `[N_dias, 8, 24]`, donde:
+        - Canal 0: Hora_sin
+        - Canal 1: Hora_cos
+        - Canal 2: Dia_sin
+        - Canal 3: Dia_cos
+        - Canal 4: Mes_sin
+        - Canal 5: Mes_cos
+        - Canal 6: Temperatura (u otro input adicional por hora)
+        - Canal 7: Variable objetivo a predecir (demanda, solar, precio, etc.). No se la pasare al modelo en si, solo la uso para evaluar durante el entrenamiento
+\nMe interesa pasarle que dia concreto del año estoy, pero los numero de 1 a 24, de 0 a 6 etc. Esto puede confundir al modelo,
+no identificando correctamente que ese valor se trata del dia y en su lugar pensar que la diferencia del dia 1 al 30 es abismal
+porque en uno pone 30 y en otro 1, por ejemplo. Para ello hago una conversion a senos y cosenos
+(ya que son simetricas necesito 2 funciones para identificar a un valor unico, ejemplo cos 0 = cos 180 = 0. Pero el seno de ambos si es distinto, +-1 respectivamente),
+que normaliza y tiene ya un "patron temporal".
+
+\n2) Para cada índice:
+        - Recupera los datos del día actual y los 14 días anteriores (por eso el tamaño del dataset es `N_dias - 15`).
+        - Genera un vector con las variables del día actual en formato `[7, 24]`. ( 7 variables, 1 dia, 24 horas, una matriz 2d, vease una tabla)
+        - Genera el histórico completo de `[8, 14, 24]` (8 variables, 14 dias, 24 horas, una matriz 3d basicamente), donde el canal 7 del histórico representa la evolución de la variable objetivo.
+        - Aplica ruido aleatorio en un 20% de las muestras (parámetro `ruido_usado` escala ese ruido). Este ruido afecta tanto al objetivo como al histórico, para evitar overfitting.
+        Tengo pocos datos, y en una red relativamente compleja puede "memorizar" todos los valores y no aprender a predecir en la realidad. Con el ruido (un un dropout en el entrenamiento) evito esto, tengo "datos nuevos infinitos", pero de peor calidad (ruido, no reales)
+        - El objetivo (`y`) se obtiene como el vector de 24 horas de la variable objetivo del día actual, con el mismo ruido aplicado.
+
+    \nParámetros de inicialización:
+    - entradas : torch.Tensor, Tensor de entrada de tamaño `[N_dias, 8, 24]`, preprocesado previamente.
+    - ruido_usado : float,  Escala del ruido relativo que se aplicará a la variable objetivo. Ejemplo: `0.01` aplicará un 1% de ruido (recordatorio que no a todas las muestras se les aplica ruido, sol al 20%).
+
+    \nDevuelve en cada `__getitem__`:
+    - Un tuple de 2 elementos:
+        1) Diccionario:
+            - `"actuales"` : Tensor `[7, 24]`: Variables del día actual (sin incluir la variable objetivo).
+            - `"historico"` : Tensor `[8, 14, 24]`: Histórico de 14 días, incluyendo la variable objetivo como último canal.
+        2) Tensor `objetivo`: Tensor `[24]`: Vector objetivo a predecir (por defecto la demanda, pero depende del dataset usado).
+
+    \nNotas:
+    - El ruido se aplica tanto al histórico como al objetivo del día actual. El mismo ruido, para eliminar todas las variables aleatorias posibles al empeorar la "calidad" de los datos a cambio de cantidad.
+    - Los canales del día actual **no** incluyen la variable objetivo (se quita explícitamente, solo esta ahi para la evaluacion durante el entrenamiento).
+    - El dataset espera recibir días suficientes para poder hacer slicing con 14 días previos más el día objetivo (por eso `__len__` devuelve `N_dias - 15`).
+
+    """
+
     def __init__(self, entradas, ruido_usado):
         """
         entradas: Tensor [N_dias, 8, 24]
@@ -120,6 +193,64 @@ class ForecastSingleFeatureDataset(Dataset):
 
 
 class ResidualBlock1D(nn.Module):
+    """
+    \nRed neuronal convolucional híbrida de doble input diseñada para predicción de series temporales horarias (24 pasos de tiempo por día), a partir de inputs multicanal diarios y un histórico multicanal de 14 días.
+
+    \nArquitectura basada en doble entrada ("Dual Input"):
+    1) **Entrada actual (día objetivo):**
+    Tensor de tamaño `[batch, 7, 24]` que contiene las variables conocidas del día actual, excluyendo la variable objetivo (se usará para evaluación pero no se pasa como input). Incluye codificaciones temporales (día, hora, mes, etc.) y otros inputs como temperatura.
+
+    2) **Histórico (14 días previos):**
+    Tensor de tamaño `[batch, 8, 14, 24]` que contiene las mismas variables del día actual pero extendidas a los 14 días previos, incluyendo también la variable objetivo histórica (por eso tiene 8 canales frente a los 7 del día actual, conociendo el historial predigo presente/futuro).
+
+    ---
+
+    \n**Flujo interno de la red:**
+
+    - **Rama Actual (`actuales`):**
+        - Dos convoluciones 1D seguidas de batch norm y activación ReLU.
+        - Un bloque residual (`ResidualBlock1D`) que mejora el flujo de gradiente en entrenamiento profundo.
+
+    - **Rama Histórico (`historico`):**
+        - Tres convoluciones 2D con batch norm y ReLU, operando sobre las dimensiones [canales × días × horas].
+        - Reducción de la dimensión "días" mediante `.mean(dim=2)`. Condensa el histórico completo a un tensor de tamaño `[batch, hidden_dim, 24]`.
+
+    - **Fusión y salida:**
+        - Concatenación de ambas ramas a lo largo de la dimensión de canales, tensor `[batch, 2×hidden_dim, 24]` (hiddendim x2 por que sumo el ancho de las 2 entradas, act e hist).
+        - Dropout para regularización y evitar overfitting.
+        - Dos capas finales convolucionales 1D:
+            - Primera: expansión a `hidden_dim` con batch norm y ReLU.
+            - Segunda: proyección final a un canal de salida, `[batch, 1, 24]`.
+        - Se aplica una ReLU final para evitar predicciones negativas (útil cuando el target es energía, demanda, etc.).
+
+    ---
+
+    \n**Parámetros de inicialización:**
+    - `hidden_dim` : int_ Número de canales ocultos internos. Por defecto 256.
+
+    ---
+
+    \n**Forward Input esperado:**
+    - Diccionario Python con dos claves:
+        - `"actuales"`: Tensor `[batch, 7, 24]`
+        - `"historico"` → Tensor `[batch, 8, 14, 24]`
+
+    ---
+
+    \n**Output:**
+    - Tensor `[batch, 24]`: para las 24 horas del día objetivo.
+
+    ---
+
+    \n**Notas de implementación:**
+    - La red está optimizada para tareas de forecasting de variables como demanda eléctrica, solar o precio.
+    - El histórico pasa por convoluciones 2D para aprovechar el contexto inter-día, mientras que el día actual va por convoluciones 1D (secuencias horarias).
+    - El bloque residual en la rama actual permite mejorar la capacidad de aprendizaje sin degradación por profundidad.
+    - El `.mean(dim=2)` condensa de forma simple el histórico, pero podrías explorar atenciones o RNNs si quisieras una fusión más compleja.
+    - La capa final está pensada para trabajar a nivel de hora: 24 outputs independientes por batch.
+
+    """
+
     def __init__(self, channels):
         super().__init__()
         self.conv1 = nn.Conv1d(channels, channels, kernel_size=3, padding=1)
@@ -194,7 +325,59 @@ class DualInputForecastNet(nn.Module):
 
 
 def preparar_datos_para_training(df, secuencia=24, key_historicos="Demanda",dia_inicio=None, dia_fin=None):
-    """funcion previa al dataset"""
+    """
+    \nPreprocesa un DataFrame de series temporales (normalmente demanda, solar o precio) para generar un tensor listo para ser usado en el Dataset `ForecastSingleFeatureDataset`.
+
+    \nConvierte cada día (con sus 24 horas) en un bloque multicanal con variables normalizadas y codificadas cíclicamente (hora, día de la semana, mes).
+Además devuelve el factor de ruido usado para el tipo de variable objetivo, que luego se usará en el dataset durante el entrenamiento.
+
+    ---
+
+    \n**Flujo:**
+    1) Filtra el DataFrame por rango de días (`dia_inicio`, `dia_fin`) si estos parámetros se indican.
+    2) Calcula codificaciones cíclicas para la hora, el dia y el mes, cada uno con un par de seny y coseno.
+    3) Normaliza la temperatura al rango `[0, 1]`.
+    4) Agrupa los datos en bloques diarios de 24 horas.
+    5) Para cada día completo, construye un tensor de tamaño `[8, 24]`, donde cada canal corresponde a:
+        - Canal 0: Hora_sin
+        - Canal 1: Hora_cos
+        - Canal 2: Dia_sem_sin
+        - Canal 3: Dia_sem_cos
+        - Canal 4: Mes_sin
+        - Canal 5: Mes_cos
+        - Canal 6: Temperatura normalizada
+        - Canal 7: Variable objetivo (`key_historicos`), como demanda, solar o precio
+
+    ---
+
+    \n**Control de ruido:**
+    - Según el valor de `key_historicos`, define un nivel de ruido recomendado:
+        - Si es `"PotenciaSolar"`: Ruido muy bajo (`0.0001`)
+        - Para el resto: Ruido estándar (`0.001`)
+    Dichos valores se han decidido a base de prueba y error y experiencia en el modelo usado
+    Este valor se usará más adelante en el dataset para aplicar ruido a la salida y al histórico.
+
+    ---
+
+    \n**Parámetros:**
+    - `df` : pd.DataFrame, DataFrame original, ya con columna `"DATE"` y todas las variables necesarias.
+    - `secuencia` : int (default=24), Número de pasos por día. Generalmente 24 para datos horarios.
+    - `key_historicos` : str, Nombre de la columna del DataFrame que contiene la variable objetivo (demanda, solar o precio).
+    - `dia_inicio`, `dia_fin` : int or None, Filtrado opcional por rango de días numéricos (`Dia_int`). Si no se indica, se usan todos los días disponibles.
+
+    ---
+
+    \n**Returns:**
+    - `entradas` : torch.Tensor, Tensor de tamaño `[N_dias, 8, 24]`, donde `N_dias` es el número de días completos disponibles (aqui ya va predicho el valor).
+    - `ruido_usado` : float, Escala de ruido a aplicar durante el entrenamiento.
+    ---
+
+    \n**Notas:**
+    - La función asume que el DataFrame ya tiene columnas: `"DATE"`, `"Hora_int"`, `"Dia_sem"`, `"Mes"`, `"Temperatura"`, y la variable especificada en `key_historicos`.
+    - Si no se encuentran días completos (24h por día), la función lanza un error.
+    - La estructura de salida está específicamente diseñada para alimentar el dataset `ForecastSingleFeatureDataset`.
+
+    """
 
     # Define intensidad de ruido por tipo de variable
     if key_historicos == "PotenciaSolar":
@@ -251,7 +434,57 @@ def preparar_datos_para_training(df, secuencia=24, key_historicos="Demanda",dia_
     return torch.stack(entradas), ruido_usado  # [N_dias, 6, 24], 1
 
 def preparar_datos_para_predecir_real(df, secuencia=24, key_historicos="Demanda",dia_inicio=None, dia_fin=None):
-    """funcion previa al dataset"""
+    """
+    \nPreprocesa un DataFrame de series temporales (demanda, solar o precio) para crear un tensor listo para predicción real con el modelo `DualInputForecastNet`.
+    A diferencia de `preparar_datos_para_training`, aquí **no se añade ruido** y se conserva la secuencia real de la variable objetivo (sin modificar).
+
+    ---
+
+    \n**Objetivo:**
+    - Convertir el DataFrame de entrada en un tensor `[N_dias, 8, 24]` apto para pasarlo al Dataset (`ForecastSingleFeatureDataset`) y hacer predicciones reales.
+    - Devolver también un vector con las fechas efectivas que el modelo va a predecir (teniendo en cuenta los primeros 15 días de historial).
+
+    ---
+
+    \n**Flujo:**
+    1) Filtra el DataFrame por rango de días (`dia_inicio`, `dia_fin`) si se indican.
+    2) Calcula codificaciones cíclicas para hora, día y mes (pares seno/coseno para cada uno).
+    3) Normaliza la temperatura al rango `[0, 1]`.
+    4) Agrupa los datos en bloques diarios de 24 horas.
+    5) Detecta cuáles son los días completos (con 24 horas de datos).
+    6) Calcula qué días se van a predecir efectivamente (saltando los primeros 15 días necesarios de historial).
+    7) Genera un tensor `[N_dias, 8, 24]`, donde cada día contiene:
+        - Canal 0: Hora_sin
+        - Canal 1: Hora_cos
+        - Canal 2: Dia_sem_sin
+        - Canal 3: Dia_sem_cos
+        - Canal 4: Mes_sin
+        - Canal 5: Mes_cos
+        - Canal 6: Temperatura normalizada
+        - Canal 7: Variable objetivo real (sin ruido, tal como está en el DataFrame)
+
+    ---
+
+    \n**Parámetros:**
+    - `df` : pd.DataFrame, DataFrame original, ya con columna `"DATE"` y todas las variables necesarias.
+    - `secuencia` : int (default=24), Número de pasos por día. Generalmente 24 para datos horarios.
+    - `key_historicos` : str, Nombre de la columna del DataFrame que contiene la variable objetivo (ejemplo `"Demanda"`, `"PotenciaSolar"`, `"Precio"`).
+    - `dia_inicio`, `dia_fin` : int or None , Filtrado opcional por rango de días (`Dia_int`). Si no se indican, usa todos los días disponibles.
+
+    ---
+
+    \n**Returns:**
+    - `entradas` : torch.Tensor, Tensor de tamaño `[N_dias, 8, 24]`, donde `N_dias` es el número de días completos.
+    - `ruido_usado` : float, Valor fijo `0`, ya que aquí no se aplica ruido (predicción real, no entrenamiento).
+
+    ---
+
+    \n**Notas:**
+    - Se asegura que sólo se incluyan días completos (24h), y sólo predice a partir del día 16 en adelante (por necesidad de historial de 15 días).
+    - Estructura de salida diseñada para alimentar directamente al Dataset y luego al modelo.
+    - No altera la variable objetivo, no añade ruido, no hay data augmentation. Es para evaluación o predicción sobre datos reales.
+    - Si no hay días suficientes, lanza un error.
+    """
 
     ruido_usado = 0
 
@@ -321,7 +554,7 @@ def preparar_datos_para_predecir_real(df, secuencia=24, key_historicos="Demanda"
 
 
 def entrenar_dual_input(datos_dataset, ruido_usado,epochs=10000,lr=1e-3,device="cuda",ruta_modelo=None):
-
+voy por aqui
     batch_size = 2048
     dataset = ForecastSingleFeatureDataset(datos_dataset, ruido_usado)
     loader = DataLoader(dataset,batch_size=batch_size,shuffle=True,num_workers=8,pin_memory=True,persistent_workers=True)
