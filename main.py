@@ -1354,7 +1354,7 @@ def main():
     Main del codigo.
 
     Tiene un argparse, que permite ejecutar el codigo en 2 modos
-    - "historico"'": lee solo los historicos y saca la capacidad optima para esos datos, iterando y optimizando para varios precios de mercado.
+    - "historico": lee solo los historicos y saca la capacidad optima para esos datos, iterando y optimizando para varios precios de mercado.
     - "diario": lee historicos, precios hasta hoy, y predice con ia/modelo clasico los datos futuros. Solo hace una optimizacion a datos fijos, la de mañana y la devuelve.
 
     Como bonus calculo el tiempo que tardo, por curiosidad y medir grado de optimizacion del codigo.

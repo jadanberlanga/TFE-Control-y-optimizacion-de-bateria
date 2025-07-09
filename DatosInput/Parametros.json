@@ -4,7 +4,7 @@
     "precio_bat_tipo": 200,
     "potencia_carga_bat_tipo": 1,
     "potencia_descarga_bat_tipo": 1,
-    "porcentaje_decimal_usable_capacidad": 0.75
+    "porcentaje_decimal_usable_capacidad": 0.65
   },
   "param_usuario": {
     "potencia_contratada": 4,
@@ -26,7 +26,7 @@
     "longitud": -5.97317,
     "altura_metros": 15,
     "zona_horaria": "Europe/Madrid",
-    "eficiencia_%": 14,
+    "eficiencia_porcentaje_decimal": 0.14,
     "paneles_m2": 10,
     "potencia_max_w_m2": 250
   },
@@ -39,8 +39,8 @@
       "plot_intermedio": "100,200.5,300",
       "json_generales": "resultados_generales_panel.json",
       "json_detalle": "resultados_detalle_panel.json",
-      "paso_general": 100,
-      "paso_detalle": 10,
+      "paso_general": 50,
+      "paso_detalle": 5,
       "rango_inicio_general": 0,
       "rango_fin_general": 3,
       "capacidad_min": 0.5,

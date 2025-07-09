@@ -634,7 +634,7 @@ necesaria del nombre del archivo (fechas y nombre base) y lanza la funcion para 
 
 def calculo_paneles(parametros_json,irradancias_vector):
     """
-    \nTodo este archivo se ha estado trabajando con irracancias, que si bien es el dato clave que teng oque obtener, no es el dato que voy a usar.
+    \nTodo este archivo se ha estado trabajando con irradancias, que si bien es el dato clave que teng oque obtener, no es el dato que voy a usar.
 En su lugar quiero la potencia solar que obtengo en funcion de la irradancia y los datos de los paneles solares del usuario.
 
 \nLa irradancia son W/m2, la potencia son kW. El primer paso es meter la eficiencia de los paneles, solo uso un % de la irradancia solar total.
@@ -650,7 +650,28 @@ Por ultimo compruebo que no supero los limites de generacion maxima de los panel
     \n- vector con el mismo formato que irradancias_vector, solo que ahora contiene datos de kW de potencia solar
     """
 
-    eficiencia = parametros_json["param_solares"]["eficiencia_%"] / 100  #viene en %, paso a decimal /100
+
+    #Leo el procentaje de la bateria que quierpo que sea usable. Y meto aalgun paso previo como ver que sea un numero o este en tre 0 y 1, por si acaso
+    try:
+        eficiencia = parametros_json["param_solares"]["eficiencia_porcentaje_decimal"] # viene en decimal ya
+
+        # Verifica que sea numero
+        if not isinstance(eficiencia, (int, float)):
+            raise ValueError("El valor de 'eficiencia' debe ser numérico (en decimales, por ejemplo 0.5.")
+
+        # Validar porcentaje usable
+        if 1 < eficiencia <= 100:
+            print(
+                "⚠️  Advertencia: El valor de 'eficiencia' espera un numero decimal (0-1), pero parece estar en porcentaje (1–100). Se asumirá como tal y se dividirá entre 100.")
+            eficiencia = eficiencia / 100
+        elif not (0 < eficiencia <= 1):
+            raise ValueError(
+                "El valor de 'eficiencia' debe estar entre 0 y 1 (por ejemplo, 0.5). Probablemente escribiste un número fuera de rango.")
+
+    except KeyError as e:
+        raise ValueError(
+            f"Falta la clave esperada en los parámetros: {e}. Asegúrate de que 'bateria_elegida' contenga 'capacidad_elegida_tot' y 'eficiencia'.")
+
     paneles_m2 = parametros_json["param_solares"]["paneles_m2"]          #m2 de paneles solares. La irradancia son w/m2, con esto w
     potencia_max_w_m2 = parametros_json["param_solares"]["potencia_max_w_m2"]  # potencia maxima del panel en w/m2. Da igual si tengo mas irradancia, el panel no da mas
 
