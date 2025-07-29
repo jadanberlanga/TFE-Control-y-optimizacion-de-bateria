@@ -23,6 +23,9 @@ def load_endesa(fecha_ini,fecha_fin,format_fecha,ruta_archivo):
     \n- df : pandas.DataFrame con los datos cargados y recortados entre las fechas especificadas. Si el archivo no existe, retorna 0.
     """
 
+    print("aux ruta arc")
+    print(ruta_archivo)
+
     if os.path.exists(ruta_archivo):
         print(f"El archivo {ruta_archivo} existe, cargando.")
         df = pd.read_csv(ruta_archivo, sep='\t')
@@ -589,6 +592,15 @@ de paridad estructural con `comprobar_paridad(...)`. Si tod0 es consistente, gua
     """
 
     #print(fecha_ini,fecha_fin)
+    print("aux rutas archivos")
+    print(ruta_datos_endesa)
+    print(ruta_fuente_endesa)
+    print(ruta_datos_omie)
+    print(ruta_fuente_omie)
+    print(ruta_datos_solar)
+    print(ruta_fuente_solar)
+    print(ruta_datos_temperaturas)
+    print(ruta_fuente_temperaturas)
 
 
     datos_endesa = load_endesa(fecha_ini, fecha_fin, format, ruta_datos_endesa)  # funcion para cargar datos_input de endesa

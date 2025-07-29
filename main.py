@@ -99,9 +99,10 @@ Genera un archivo de datos con valores reales o pendientes, y su correspondiente
     fecha_fin_scrap = None
 
     #WARNING, ESTA FUNCION EN REALIDAD NO ESTA HECHA, SOLO ESTA AQUI DE PLACEHOLDER
+
     ruta_consumos_presente_datos, ruta_consumos_presente_fuente = endesa.crear_nuevo_archivo_edistribucion_futuros(fecha_ini_scrap,fecha_fin_scrap,fecha_ini.strftime(formato),
     fecha_fin.strftime(formato),nombre_archivo_output_base_presente_datos,nombre_archivo_output_base_presente_fuente,carpeta,df_datos_scrapeados_previos,formato=formato)
-    ruta_consumos_presente_datos, ruta_consumos_presente_fuente = None,None #OVERRIDE DE CUALQUIER COSA QUE HAYA DADO ESA FUNCION INCOMPLETA
+    #ruta_consumos_presente_datos, ruta_consumos_presente_fuente = None,None #OVERRIDE DE CUALQUIER COSA QUE HAYA DADO ESA FUNCION INCOMPLETA
     # esto habra creado un archivo con todas las fechas que ha podido sacar. Desde el fin hasta la fecha ahora es trabajo de la IA. Marcare esos datos faltantes como 0.
     # para no confundir estos 0 con 0 reales los marcare en el gemelo de fuentes de este archivo. ya le tocara a la IA trabajar, no aun.
 
@@ -1212,13 +1213,14 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
 
     # === inicializo todos los datos de presente ===
     ruta_consumos_presente_datos, ruta_consumos_presente_fuente = inicializar_consumos_futuros(parametros, fecha_ultima,fecha_objetivo, formato)
-    # print(ruta_consumos_futuros)
+    print("weaasdsad")
+    print(ruta_consumos_presente_datos, ruta_consumos_presente_fuente)
     ruta_precios_presente_datos, ruta_precios_presente_fuente = inicializar_precios_futuros(parametros, fecha_ultima,fecha_objetivo, formato)
-    # print(ruta_precios_futuros)
+    # print(ruta_precios_presente_datos, ruta_precios_presente_fuente)
     ruta_irradancias_presente_datos, ruta_irradancias_presente_fuente = inicializar_irradiancias_futuros(parametros,fecha_ultima,fecha_objetivo,formato)
-    # print(ruta_solar_futuros)
+    # print(ruta_irradancias_presente_datos, ruta_irradancias_presente_fuente)
     ruta_temperaturas_presente_datos, ruta_temperaturas_presente_fuente = inicializar_temperaturas_futuros(parametros,fecha_ultima,fecha_objetivo,formato)
-    # print(ruta_temperaturas_futuros)
+    # print(ruta_temperaturas_presente_datos, ruta_temperaturas_presente_fuente)
 
     datos_futuros_emparejados, fuentes_futuras_emparejadas = inicializar_vector_emparejados_futuros(parametros,fecha_objetivo, formato,
                                                                                                     ruta_consumos_presente_datos,
