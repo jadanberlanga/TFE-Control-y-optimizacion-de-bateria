@@ -314,7 +314,7 @@ sabra que tiene que generar y cual es un dato real, el cual no necesita generar.
     df_omie_fuentes = pd.DataFrame({
         "DATE": df_omie["DATE"].values
     })
-    # Luego añadimos cada columna hora directamente con un escalar "Real"
+    # Luego añadimos cada columna hora directamente con una cadena de caracteres,  "Real"
     for h in [f"H{i}" for i in range(1, 25)]:
         df_omie_fuentes[h] = "Real"
 

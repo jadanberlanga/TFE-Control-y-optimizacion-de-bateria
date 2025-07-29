@@ -221,7 +221,7 @@ como, opcionalmente, la propia capacidad de la batería.
     \nFlujo principal:
     \n1) Define `capacidad_bateria` como variable (o constante si le paso una capacidad_bateria_fija distinta a -1).
     \n2) Carga parámetros de potencia de carga/descarga, potencia contratada y multiplicadores de demanda (el multiplicador es puramente de debug y testeo, no tiene sentido eb calculo real).
-    \n3) Calcula `target_days` para repartir el coste de adquisición inicial de la batería y amortizarla en el periodo que queramos (vease, la garantia de la bateria, el tiempo que la podre usar).
+    \n3) Calcula `target_hours` para repartir el coste de adquisición inicial de la batería y amortizarla en el periodo que queramos (vease, la garantia de la bateria, el tiempo que la podre usar).
     \n4) Lee `porcentaje_decimal_usable` de parámetros y ajusta la capacidad utilizable.
     \n5) Prepara variables CVXPY para:
         - `demanda_bateria` (potencia demandade por batería cada hora, y sea positiva o negativa)
@@ -229,7 +229,7 @@ como, opcionalmente, la propia capacidad de la batería.
         - `coef_solar` (fracción de uso de la energía solar, no siempre quere usar el 100% de la energia solar, a veces genero mas de lo que puedo consumir factiblemente)
     \n6) Define la función objetivo `coste` que combina:
         - Coste de energía comprada a la red
-        - Amortización de la batería (`capacidad_usable * precio_unit_bat_tipo / target_days`)
+        - Amortización de la batería (`capacidad_usable * precio_unit_bat_tipo / target_hours`)
     \n7) Añade restricciones:
         - Estado de carga inicial/final (`carga_previa`, `carga_restante`)
         - Límites de potencia de carga/descarga
@@ -300,7 +300,7 @@ como, opcionalmente, la propia capacidad de la batería.
     potencia_contratada = potencia_contratada * multiplicador_demandas #doy mas rango de Pmax
 
     #la bateria tengo que comprarla, eso es un coste extra. Voy a repartir su precio en el periodo planeo estar usandola
-    target_days = target_years*365.25*24  #paso los años a dias, mas comodo. Existen los bisiestos, .25
+    target_hours = target_years * 365.25 * 24  #paso los años a dias, mas comodo. Existen los bisiestos, .25
 
     #Leo el procentaje de la bateria que quierpo que sea usable. Y meto aalgun paso previo como ver que sea un numero o este en tre 0 y 1, por si acaso
     try:
@@ -353,15 +353,16 @@ como, opcionalmente, la propia capacidad de la batería.
     # coste = sum[(demanda_casa+demanda_bateria-energia_aportada_paneles_solares)*precio] + [(kwh_bateria*precio_kwh_bateria)/dias_en_años_de_calc]
     # son vectores tod0 asi que tengo que mulplicar 1 a 1 y sumarlos
     coste = cp.sum(cp.multiply((demanda_casa + demanda_bateria - cp.multiply(paneles, coef_solar)), precio) + (
-            (capacidad_bateria_usable * precio_unit_bat_tipo_procesado) / target_days))
+            (capacidad_bateria_usable * precio_unit_bat_tipo_procesado) / target_hours))
 
     #coste += cp.sum(residuo) * coste_extra #añado penalizacion
 
     # y añado restricc y cond
     # restricciones = [cp.sum(demanda_bateria) == carga_restante]  # suma al final del calculo 0 ( lo que diga que sea). Aunque no del tod0, reserva ini y final pero
     restricciones = []  #creo lista de restricciones (vacia aun, pero la creo)
-    restricciones.append(energia_bateria[-1] == carga_restante) #o mejor que sumar a lo bruto mejor digo que la energia final sea la energia final que quiero
 
+    #condiciones de energia final e inicial
+    restricciones.append(energia_bateria[-1] == carga_restante) #o mejor que sumar a lo bruto mejor digo que la energia final sea la energia final que quiero
     restricciones.append(energia_bateria == carga_previa + cp.cumsum(demanda_bateria))
 
 

@@ -13,6 +13,21 @@ import emparejar_datos_endesa_omie as emparejarEO #temporal solo todo
 
 
 def plot_simple(vector_precio,vector_casa,vector_bateria):
+    """
+    Genera una visualización simple del precio eléctrico y las demandas de casa y batería durante un día.
+
+    \n- Muestra dos gráficas: una para el precio horario de la electricidad y otra para las demandas.
+    \n- La demanda de casa y batería se plotean juntas para ver cómo se relacionan.
+    \n- Incluye etiquetas, leyendas y una línea horizontal en 0 para facilitar la lectura.
+
+    \nParámetros:
+    \n- vector_precio : lista o array de 24 valores (precio por hora).
+    \n- vector_casa : lista o array de 24 valores (demanda eléctrica de la casa).
+    \n- vector_bateria : lista o array de 24 valores (demanda positiva o negativa de batería).
+
+    \nReturns:
+    \n- No retorna nada útil; solo muestra el gráfico al usuario.
+    """
 
     #vamos a poner 2 graficas, 1 para el precio, otro para demandas
     fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)  # 2 filas, 1 columna
@@ -55,7 +70,39 @@ def plot_simple(vector_precio,vector_casa,vector_bateria):
 
     return
 
+
+
 def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, float_precio_unitario_tipo, fecha_inicio=None, formato_fecha="%d-%m-%y",parar_calc=True):
+    """
+    Genera un conjunto de gráficos para visualizar series temporales de consumo y precio eléctrico.
+
+    Este plot tiene dos modos, uno diario, que segmenta los vectores por dia y representa todos los dias segmentados superpuestos
+    con distintos colores para ayudar a la visualziacion. El segundo modo es el anual, que segmenta por años, para poder ver la tendencia anual.
+    El modo por defecto, y el mas comun y con sentido es la segmntacion por dias.
+    En función del parámetro `fecha_inicio`, adapta el eje X para mostrar las horas del día o el mes correspondiente. Permite visualizar la evolución
+    de cuatro magnitudes clave:
+    \n- Precio horario de electricidad.
+    \n- Demanda eléctrica de la vivienda.
+    \n- Demanda/uso de la batería.
+    \n- Energía acumulada en la batería.
+
+    Para poder diferenciar entre varios segmentos (pueden representarse cientos en una grafica) se define una tabla de colores y se rotara por ella
+    asignando colores a cada uno, y volviendo a iniciar en la tabla cuando se llegue al fin (hay mas datos que colores). Tambien se aplican varias
+    configuraciones para mejorar la representacion
+
+    \nParámetros:
+    \n- vector_precio : array con los precios horarios (tamaño múltiplo de 24).
+    \n- vector_casa : array con la demanda de la casa por hora.
+    \n- vector_bateria : array con la demanda de batería por hora (positiva o negativa).
+    \n- vector_energia : energía acumulada en batería hora a hora.
+    \n- float_precio_unitario_tipo : precio €/kWh del tipo de batería que se está usando (para mostrar en título).
+    \n- fecha_inicio : string o datetime opcional. Si se indica, el eje X muestra los meses (modo anual).
+    \n- formato_fecha : formato de la fecha si `fecha_inicio` es string. Por defecto "%d-%m-%y".
+    \n- parar_calc : bool. Si True, pausa al mostrar el gráfico. Útil para debug manual.
+
+    \nReturns:
+    \n- No retorna nada útil; genera y muestra la figura por pantalla.
+    """
 
     #tengo 2 modos, uno diario, el default, y otro anual, si le paso una fecha de incio
     #por defecto sera false, pero si es algo entonces:
@@ -180,7 +227,40 @@ def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, floa
 
     return
 
+
+
 def plot_multiples_aux(vector_precio,vector_casa,vector_bateria,vector_energia, fecha_inicio=None, formato_fecha="%d-%m-%y"):
+    """
+    Genera un conjunto de gráficos para visualizar series temporales de consumo y precio eléctrico.
+
+    Este plot tiene dos modos, uno diario, que segmenta los vectores por día y representa todos los días superpuestos
+    con distintos colores para ayudar a la visualización. El segundo modo es el anual, que representa los datos de forma continua
+    desde una fecha de inicio para poder ver tendencias más largas.
+    El modo por defecto, y el más común y con sentido, es la segmentación por días.
+    En función del parámetro `fecha_inicio`, adapta el eje X para mostrar las horas del día o los meses correspondientes. Permite visualizar
+    la evolución de seis magnitudes clave:
+
+    \n- Precio horario de electricidad.
+    \n- Demanda eléctrica de la vivienda.
+    \n- Demanda/uso de la batería.
+    \n- Energía acumulada en la batería.
+    \n- Cumsum de batería sin restricciones (energía acumulada ideal).
+    \n- Diferencia entre energía ideal y la energía real tras aplicar límites (ReLU).
+
+    Para poder diferenciar entre varios segmentos (pueden representarse cientos en una misma gráfica) se define una paleta de colores
+    y se rota por ella asignando colores a cada uno. También se aplican varias configuraciones para mejorar la representación visual.
+
+    \nParámetros:
+    \n- vector_precio : array con los precios horarios (tamaño múltiplo de 24).
+    \n- vector_casa : array con la demanda de la casa por hora.
+    \n- vector_bateria : array con la demanda de batería por hora (positiva o negativa).
+    \n- vector_energia : energía acumulada en batería hora a hora.
+    \n- fecha_inicio : string o datetime opcional. Si se indica, el eje X muestra los meses (modo anual).
+    \n- formato_fecha : formato de la fecha si `fecha_inicio` es string. Por defecto "%d-%m-%y".
+
+    \nReturns:
+    \n- No retorna nada útil; genera y muestra la figura por pantalla.
+    """
 
     #tengo 2 modos, uno diario, el default, y otro anual, si le paso una fecha de incio
     #por defecto sera false, pero si es algo entonces:
@@ -343,11 +423,24 @@ def plot_multiples_aux(vector_precio,vector_casa,vector_bateria,vector_energia, 
 
     return
 
+
+
 #la funcion de arriba pero simplificada a un solo vector
 def plot_datos_por_dia(vector_datos, horas=24, titulo="Datos horarios", etiqueta_y="Valor", colores=None):
     """
-    Divide un vector largo en días de 'horas' horas, y lo plotea por día con colores diferentes.
+    Representa un vector horario largo dividiéndolo por días y mostrando un gráfico por día con distintos colores.
+
+    Cada fila del gráfico representa un día con 'horas' puntos, permitiendo visualizar patrones diarios fácilmente.
+    Los colores se asignan cíclicamente para distinguir entre días.
+
+    Parámetros:
+    - vector_datos : lista o array con datos horarios (múltiplo de 'horas').
+    - horas : número de horas por día (por defecto 24).
+    - titulo : título del gráfico.
+    - etiqueta_y : etiqueta del eje Y.
+    - colores : lista opcional de colores para los días.
     """
+
     n_dias = len(vector_datos) // horas
     matriz_datos = np.array(vector_datos[:n_dias * horas]).reshape(n_dias, horas)
 
@@ -373,6 +466,7 @@ def plot_datos_por_dia(vector_datos, horas=24, titulo="Datos horarios", etiqueta
 
 
 
+"""
 def plot_guia_compra_simple(vector_precios,vector_capacidad):
     plt.figure(figsize=(10,8))
     plt.plot(vector_precios, vector_capacidad, "-", color="tab:blue", linewidth=2)
@@ -382,8 +476,44 @@ def plot_guia_compra_simple(vector_precios,vector_capacidad):
     plt.grid(alpha=0.3)
     plt.legend()
     plt.show()
+"""
+
+
 
 def plot_guia_compra_doble(vector_precios_general=None, vector_capacidad_general=None,vector_precios_detalle=None, vector_capacidad_detalle=None,ruta_json_general=None, ruta_json_detalle=None,parar_calc=False):
+    """
+    Muestra dos gráficas que ayudan a seleccionar la capacidad óptima de batería según distintos precios por kWh.
+
+    Este helper puede trabajar con datos en memoria (vectores) o cargarlos desde dos JSON de resultados
+    (general y detalle). Para cada serie:
+      1. Se ordenan los pares (precio, capacidad) por precio creciente.
+      2. Se calcula el coste total (€) como precio × capacidad.
+      3. Se dibuja:
+         - Eje principal: capacidad (kWh) vs precio (€/kWh).
+         - Eje secundario (twin y): coste total (€) vs precio (€/kWh).
+
+    Se incluyen varias configuraciones varias con cuestiones esteticas y dar una gráfica mas "bonita"
+
+    Parámetros:
+    - vector_precios_general : list[float] | None
+        Precios base para la gráfica “General” (si no se pasa JSON).
+    - vector_capacidad_general : list[float] | None
+        Capacidades asociadas a `vector_precios_general`.
+    - vector_precios_detalle : list[float] | None
+        Precios para la gráfica “Detalle”.
+    - vector_capacidad_detalle : list[float] | None
+        Capacidades asociadas a `vector_precios_detalle`.
+    - ruta_json_general : str | None
+        Ruta a JSON con un dict {clave: {"Precio kWh":…, "Capacidad Bateria":…}, …}.
+        Si se proporciona, ignora `vector_precios_general` y `vector_capacidad_general`.
+    - ruta_json_detalle : str | None
+        Idem para la gráfica “Detalle”.
+    - parar_calc : bool
+        Si True, bloquea la ejecución al mostrar la figura (útil para debug interactivo).
+
+    No retorna nada; genera y muestra la figura.
+    """
+
     # leo el json si se pasan rutas, si no uso los vectores que le doy
     if ruta_json_general:
         with open(ruta_json_general, 'r') as f:
@@ -457,6 +587,48 @@ def plot_guia_compra_doble(vector_precios_general=None, vector_capacidad_general
 
 
 def guardar_json_resultados(ruta_json,ruta_db,clave_precio,diccionario_resultados,forma_diccionario, ruta_precalc_indexados):
+    """
+    Guarda el resultado de una optimización de ciclo de batería en JSON o en una base de datos `shelve`, asegurando consistencia
+    entre distintas ejecuciones y manteniendo un índice de claves precalculadas.
+
+    Esta rutina unifica dos modos de operación:
+      - **Calculo nuevo ("calculoCPU_normal", "calculoCPU_capacidad", "calculoGPU")**:
+        - Extrae del diccionario de resultados valores escalares y vectores (precios, demandas, energía de batería, coeficiente solar, etc.).
+        - Calcula métricas derivadas:
+            • Coste sin batería y sin paneles
+            • Coste sin batería pero con paneles
+            • Ahorro gracias al uso de la batería
+            • Coste con “batería gratis” (sólo coste de neto a red)
+        - Forma una entrada completa con todos los datos y la sobrescribe bajo la clave `clave_precio`.
+
+      - **Recuperación de precálculo ("recuperado")**:
+        - Guarda el diccionario tal cual, asumiendo que contiene ya todas las métricas y vectores en su forma final.
+
+    Almacena la entrada resultante en:
+      - Un archivo JSON (`ruta_json`), si `ruta_db` es `None`.
+      - Un `shelve` en disco (`ruta_db`), si se proporciona.
+
+    Además, gestiona un archivo de índice (`ruta_precalc_indexados`) que contiene una lista de todas las keys procesadas:
+      - Si la clave no existe, la añade al final.
+      - Si ya existe, la deja intacta.
+
+    Durante el guardado, imprime por consola un resumen legible de los parámetros clave:
+      - Precio unitario de la batería, capacidad óptima, porcentaje y capacidad usable.
+      - Costes comparativos (con y sin batería) y ahorro estimado.
+      - Primeros y últimos valores de los vectores de demanda y energía de batería.
+
+    Parámetros:
+    - ruta_json (str): Ruta al archivo JSON de resultados.
+    - ruta_db (str or None): Ruta a base `shelve` para almacenamiento binario; si es `None`, se usa JSON.
+    - clave_precio (str): Clave única (por ejemplo `"Ciclo_0.10_eur_kWh"`) bajo la cual se indexa este conjunto de resultados.
+    - diccionario_resultados (dict): Salida cruda del solver o precálculo, con valores escalares y vectores CVXPY (`.value`).
+    - forma_diccionario (str): Modo en que se interpretan los resultados:
+        • `"calculoCPU_normal"`, `"calculoCPU_capacidad"`, `"calculoGPU"` → nuevos cálculos
+        • `"recuperado"` → datos ya existentes en el archivo
+    - ruta_precalc_indexados (str or None): Ruta al archivo de texto con las keys indexadas; si es `None`, no actualiza índice.
+
+    No retorna nada; modifica o crea los archivos de resultados y, opcionalmente, el índice de precálculos.
+    """
     # voy a meter tod0 eso en un json y ya es problema de python y el pc
     # la parte demontar el diccionario me la puedo ahorrar si tengo la flag de dic ya montado
 
@@ -597,15 +769,24 @@ def guardar_json_resultados(ruta_json,ruta_db,clave_precio,diccionario_resultado
 
     return
 
-def leer_y_plot_json_resultados(parametros,ruta_json_detalle="resultados_detalle_panel.json",ruta_json_general="resultados_generales_panel.json",parar_calc=False):
-    '''Le voy a pasar un rango de precios a leer de los json. Luego los ploteare'''
 
-    '''
-    #si no paso rutas leelas del json
-    opciones = parametros.get("opciones_calculo", {}) #si existe esa string en el json cargala, si no dejala vacia con {} (asi no da error de key error)
-    ruta_json_general = ruta_json_general if ruta_json_general is not None else opciones.get("json_generales") #si la opcion es None entonces cargala del json. Si no es none pues nada
-    ruta_json_detalle   = ruta_json_detalle   if ruta_json_detalle   is not None else opciones.get("json_detalle")
-    '''
+
+def leer_y_plot_json_resultados(parametros,ruta_json_detalle="resultados_detalle_panel.json",ruta_json_general="resultados_generales_panel.json",parar_calc=False):
+    """
+    Lee resultados desde archivos JSON y genera gráficos para los precios especificados.
+
+    Parámetros:
+    - parametros: diccionario que contiene las opciones de cálculo, incluyendo:
+        - "opciones_calculo" → contiene la clave "plot_intermedio" con los precios objetivo separados por coma.
+    - ruta_json_detalle: ruta al archivo JSON con resultados detallados (por defecto "resultados_detalle_panel.json").
+    - ruta_json_general: ruta al archivo JSON con resultados generales (por defecto "resultados_generales_panel.json").
+    - parar_calc: si es True, activa comportamiento especial en la función `plot_multiples`.
+
+    Comportamiento:
+    - Intenta obtener datos exactos para los precios solicitados.
+    - Si no los encuentra, busca el más cercano dentro de ambos JSON.
+    - Llama a `plot_multiples()` con los datos correspondientes para graficar los resultados.
+    """
 
 
     # cargo json y leo fechas
@@ -662,19 +843,40 @@ def leer_y_plot_json_resultados(parametros,ruta_json_detalle="resultados_detalle
 
     return #resultados_filtrados
 
+
+
 def guardar_json_para_ia(ruta_output_json, diccionario_resultados):
     '''
-    diccionario_resultados = {
-        "precio": precio,                                   #vector de precios horarios de omie entero
-        "demanda_casa": demanda_casa,                       #vector de demandas de la casa de edistribucion entero
-        "paneles_solares": paneles,                         #vector de energia de los panaless solares entero
-        "precio_kwh_tipo": precio_unit_bat_tipo,            #precio del kwh de este calculo
-        "capacidad_bateria": aux_capacidad_bateria,         #capacidad optima de la bateria calculada
-        "costo_total_con_bateria": resultado,               #resultado en si del problema, costo total minimizado
-        "vector_demanda_bateria": demanda_bateria.value,    #vector de las demandas de la bateria entero
-        "vector_energia_bateria": energia_bateria.value,    #vector de la energia de la bateria en cada instante entero
-        "coeficiente_util_solar": coef_solar.value          #la utilizacion de los panales, por tenerlo
-    }
+    Guarda los resultados de una simulación u optimización energética en un archivo JSON estructurado.
+
+    Parámetros:
+    ruta_output_json : str
+        Ruta al archivo JSON donde se guardarán los resultados.
+
+
+    diccionario_resultados : dict
+        Diccionario con los siguientes campos:
+            - "precio": np.ndarray
+                Vector horario de precios eléctricos.
+            - "demanda_casa": np.ndarray
+                Vector horario de demanda eléctrica de la vivienda.
+            - "paneles_solares": np.ndarray
+                Vector horario de generación de energía solar.
+            - "precio_kwh_tipo": float
+                Precio del kWh considerado en la simulación.
+            - "capacidad_bateria": float
+                Capacidad óptima de la batería calculada.
+            - "costo_total_con_bateria": float
+                Costo total del sistema con batería.
+            - "vector_demanda_bateria": np.ndarray
+                Vector de demanda de la batería (positiva = descarga, negativa = carga).
+            - "vector_energia_bateria": np.ndarray
+                Energía acumulada en la batería en cada instante.
+            - "coeficiente_util_solar": float, opcional
+                Porcentaje del total solar aprovechado.
+
+    El JSON resultante incluirá la demanda calculada para una capacidad de batería dada,
+    además de registrar vectores base (precio, demanda, solar) si el archivo no existía.
     '''
 
 
@@ -744,9 +946,26 @@ def guardar_json_para_ia(ruta_output_json, diccionario_resultados):
 
     return
 
-def carga_datos_temp_aux(ruta_parametros_json):
-    #voy a cargar los datos que necesito. Los voy a tomar segun diga el Json de parametros
 
+
+def carga_datos_temp_aux(ruta_parametros_json):
+    """
+    Carga y devuelve los datos energéticos procesados desde la ruta especificada en un archivo JSON de parámetros.
+
+    Si el archivo CSV con los datos energéticos ya existe, lo carga directamente. En caso contrario,
+    procesa los archivos fuente y guarda el CSV resultante para futuras ejecuciones.
+
+    Parámetros:
+    ruta_parametros_json : str
+        Ruta al archivo JSON que contiene la configuración del escenario, incluyendo
+        la ruta del archivo CSV con datos energéticos procesados.
+
+    Retorna:
+    datos_EO : pd.DataFrame
+        DataFrame con los datos energéticos cargados o procesados.
+    """
+
+    #voy a cargar los datos que necesito. Los voy a tomar segun diga el Json de parametros
     #cargo (leo) el json. with lo que hace es cerrar automatico al cerrar
     with open(ruta_parametros_json, "r", encoding="utf-8") as f:
         parametros = json.load(f)

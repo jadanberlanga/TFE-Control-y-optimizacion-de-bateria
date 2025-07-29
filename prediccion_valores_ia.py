@@ -1566,7 +1566,7 @@ if __name__ == '__main__':
     dateIni_str = "29-04-25"
     dateEnd_str =  "30-04-25"
     fechas_str, datos_temperatura = temperaturas.obtener_prediccion_temperaturas(latitud, longitud, zona_horaria, dateIni_str, dateEnd_str,formato="%d-%m-%y")
-    df_futuro = emparejarEO.alinear_datos_futuros_IA(parametros, datos_temperatura, fechas_str)
+    #df_futuro = emparejarEO.alinear_datos_futuros_IA(parametros, datos_temperatura, fechas_str)
 
 
     #--------------------------------------
