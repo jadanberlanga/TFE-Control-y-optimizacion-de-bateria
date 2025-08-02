@@ -558,6 +558,6 @@ necesaria del nombre del archivo (fechas y nombre base) y lanza el scrap para cr
 if __name__ == '__main__':
     ruta_archivo = "DatosPython/Datos_Omie_01-03-2023_a_08-03-2025.csv"
     df_data = datos_omie_df(ruta_archivo)
-    print("test")
+    print("test omie")
     print(df_data)
     #df_data.to_csv('DatosPython/datosOmie.csv', index=False)

@@ -195,6 +195,34 @@ que normaliza y tiene ya un "patron temporal".
 
 class ResidualBlock1D(nn.Module):
     """
+    Bloque residual simple para series temporales 1D.
+
+    Aplica dos capas Conv1D con normalización por lotes y ReLU, y suma la entrada original al final (skip connection).
+    Útil para permitir redes más profundas sin que se degrade el aprendizaje.
+
+    Parámetros:
+    ----------
+    channels : int
+        Número de canales (features) de entrada y salida. Se mantiene constante en el bloque.
+    """
+    def __init__(self, channels):
+        super().__init__()
+        self.conv1 = nn.Conv1d(channels, channels, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm1d(channels)
+        self.conv2 = nn.Conv1d(channels, channels, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm1d(channels)
+        self.act = nn.ReLU()
+
+    def forward(self, x):
+        identity = x
+        out = self.act(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        return self.act(out + identity)
+
+
+
+class DualInputForecastNet(nn.Module):
+    """
     \nRed neuronal convolucional híbrida de doble input diseñada para predicción de series temporales horarias (24 pasos de tiempo por día), a partir de inputs multicanal diarios y un histórico multicanal de 14 días.
 
     \nArquitectura basada en doble entrada ("Dual Input"):
@@ -251,22 +279,6 @@ class ResidualBlock1D(nn.Module):
     - La capa final está pensada para trabajar a nivel de hora: 24 outputs independientes por batch.
 
     """
-
-    def __init__(self, channels):
-        super().__init__()
-        self.conv1 = nn.Conv1d(channels, channels, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm1d(channels)
-        self.conv2 = nn.Conv1d(channels, channels, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm1d(channels)
-        self.act = nn.ReLU()
-
-    def forward(self, x):
-        identity = x
-        out = self.act(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        return self.act(out + identity)
-
-class DualInputForecastNet(nn.Module):
     def __init__(self, hidden_dim=256):
         super().__init__()
         self.act = nn.ReLU()
@@ -1449,10 +1461,8 @@ def completar_datos(parametros_json, datos_emparejados, fuentes_emparejadas):
         print("\n-> Iniciando prediccion de precios futuros con IA. Esto puede tomar unos segundos.")
         datos_emparejados = predecir_modelo_IA(dia_inicio_precio, dia_fin_precio, ruta_modelo_precio, datos_emparejados, "Precio", device=device)
 
-
         print("\n-> Iniciando prediccion de demandas futuras con IA. Esto puede tomar unos segundos.")
         datos_emparejados = predecir_modelo_IA(dia_inicio_demanda, dia_fin_demanda, ruta_modelo_demanda, datos_emparejados, "Demanda", device=device)
-
 
         print("\n-> Iniciando prediccion de irradancias futuras con IA. Esto puede tomar unos segundos.")
         datos_emparejados = predecir_modelo_IA(dia_inicio_solar, dia_fin_solar, ruta_modelo_solar, datos_emparejados, "PotenciaSolar", device=device)

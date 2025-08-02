@@ -1213,8 +1213,7 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
 
     # === inicializo todos los datos de presente ===
     ruta_consumos_presente_datos, ruta_consumos_presente_fuente = inicializar_consumos_futuros(parametros, fecha_ultima,fecha_objetivo, formato)
-    print("weaasdsad")
-    print(ruta_consumos_presente_datos, ruta_consumos_presente_fuente)
+    # print(ruta_consumos_presente_datos, ruta_consumos_presente_fuente)
     ruta_precios_presente_datos, ruta_precios_presente_fuente = inicializar_precios_futuros(parametros, fecha_ultima,fecha_objetivo, formato)
     # print(ruta_precios_presente_datos, ruta_precios_presente_fuente)
     ruta_irradancias_presente_datos, ruta_irradancias_presente_fuente = inicializar_irradiancias_futuros(parametros,fecha_ultima,fecha_objetivo,formato)
