@@ -133,10 +133,10 @@ que normaliza y tiene ya un "patron temporal".
         self.ruido_usado = ruido_usado
 
     def __len__(self):
-        return self.entradas.shape[0] - (1+14) # Necesitamos 7 días previos + 1 objetivo
+        return self.entradas.shape[0] - (1+14) # Necesitamos 14 días previos + 1 objetivo
 
     def __getitem__(self, idx):
-        idx = idx + (1+14)  # desplazamos para tener -8:-1 disponibles
+        idx = idx + (1+14)  # desplazamos para tener -15:-1 disponibles
 
         # Día actual
         dia_actual = self.entradas[idx]  # [8, 24]

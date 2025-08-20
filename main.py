@@ -1336,8 +1336,9 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
     #Y si quiero ver datos puedo plotearlos
     tiempo_fin_calculo = time.time() #antes de plotear que puede quedar ahi indefinido, considero el calculo acabado
     if plot:
-        presentar.plot_multiples(dic_mannana["precio"], dic_mannana["demanda_casa"], dic_mannana["demanda_bateria"], dic_mannana["energia_bateria"], dic_mannana["precio_kwh_tipo"], fecha_inicio=None,formato_fecha="%d-%m-%y", parar_calc=False)
-        presentar.plot_multiples(dic_tot["precio"], dic_tot["demanda_casa"], dic_tot["demanda_bateria"], dic_tot["energia_bateria"], dic_tot["precio_kwh_tipo"], fecha_inicio=None, formato_fecha="%d-%m-%y", parar_calc=pausa_calc)
+        dicc_costes = {"coste_casa": coste_casa,"coste_casa_bat": coste_total,"ahorro": coste_casa - coste_total} #aux para la funcion
+        presentar.plot_multiples(dic_mannana["precio"], dic_mannana["demanda_casa"], dic_mannana["demanda_bateria"], dic_mannana["energia_bateria"], dic_mannana["precio_kwh_tipo"], fecha_inicio=None,formato_fecha="%d-%m-%y", parar_calc=False, mostrar_titulo=False,info_pie=dicc_costes)
+        presentar.plot_multiples(dic_tot["precio"], dic_tot["demanda_casa"], dic_tot["demanda_bateria"], dic_tot["energia_bateria"], dic_tot["precio_kwh_tipo"], fecha_inicio=None, formato_fecha="%d-%m-%y", parar_calc=pausa_calc, mostrar_titulo=False)
 
 
     longitud_resultado_futuro = 1 #solo ha sido 1 calculo en realidad. Uno largo, pero uno. Por estandarizar el output

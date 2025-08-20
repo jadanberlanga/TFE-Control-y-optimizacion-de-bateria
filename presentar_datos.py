@@ -72,7 +72,7 @@ def plot_simple(vector_precio,vector_casa,vector_bateria):
 
 
 
-def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, float_precio_unitario_tipo, fecha_inicio=None, formato_fecha="%d-%m-%y",parar_calc=True):
+def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, float_precio_unitario_tipo, fecha_inicio=None, formato_fecha="%d-%m-%y",parar_calc=True,mostrar_titulo=True,info_pie=None):
     """
     Genera un conjunto de gráficos para visualizar series temporales de consumo y precio eléctrico.
 
@@ -99,6 +99,8 @@ def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, floa
     \n- fecha_inicio : string o datetime opcional. Si se indica, el eje X muestra los meses (modo anual).
     \n- formato_fecha : formato de la fecha si `fecha_inicio` es string. Por defecto "%d-%m-%y".
     \n- parar_calc : bool. Si True, pausa al mostrar el gráfico. Útil para debug manual.
+    \n- mostrar_titulo : bool. Si True, muestra el titulo (con el precio del kWh). Si False no lo hace.
+    \n- info_pie : Si es None no se mostrara teto abajo, pero si le llega info (un diccionario) la mostrara
 
     \nReturns:
     \n- No retorna nada útil; genera y muestra la figura por pantalla.
@@ -140,7 +142,9 @@ def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, floa
 
 
     #vamos a poner 3 graficas, 1 para el precio, otro para demanda casa, otro para demanda bateria
-    fig, axs = plt.subplots(4, 1, figsize=(10, 10), sharex=True, constrained_layout=True)
+    #aux, mira si se quiere texto al final, eso dira si se quiere layout restringido o no
+    restringido = False if info_pie is not None else True
+    fig, axs = plt.subplots(4, 1, figsize=(10, 10), sharex=True, constrained_layout=restringido)
 
     #y cada grafica tendra varias graficas en ella, pico vectores en cachitos de 24
     #horas = len(vector_bateria) + 1 # el +1 por que los vectores empiezan en 0 y mis hora en 1
@@ -222,7 +226,24 @@ def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, floa
 
 
     #plt.tight_layout(rect=[0, 0, 1, 0.96])  # deja espacio para el suptitle arriba
-    fig.suptitle(f"Precio Batería: {float_precio_unitario_tipo:.2f} €/kWh", fontsize=14, fontweight="bold")
+    if mostrar_titulo: fig.suptitle(f"Precio Batería: {float_precio_unitario_tipo:.2f} €/kWh", fontsize=14, fontweight="bold") #titulo con su if
+
+    if info_pie is not None:
+        texto_lineas = ["Comprobación de costes:", "---------------------------------------------"]
+        texto_lineas.append(f"Coste de electricidad sin bateria     : {float(info_pie['coste_casa']):.2f} €")
+        texto_lineas.append(f"Coste de electricidad con bateria     : {float(info_pie['coste_casa_bat']):.2f} €")
+        texto_lineas.append(f"Ahorro                                : {info_pie['ahorro']:.2f} €")
+
+        texto = "\n".join(texto_lineas)
+
+        # se hace hueco abajo y se centra el texto
+        n_lineas = len(texto_lineas)
+        hueco_abajo = 0.06 + 0.03 * n_lineas  # 0.06 mínimo, +0.03 por línea
+        fig.subplots_adjust(bottom=hueco_abajo)
+
+        plt.figtext(0.5, 0.02, texto, ha="center", va="bottom",fontsize=10, family="monospace",bbox=dict(boxstyle="round,pad=0.5", facecolor="white",alpha=0.85, edgecolor="gray"))
+
+
     plt.show(block=parar_calc)
 
     return
