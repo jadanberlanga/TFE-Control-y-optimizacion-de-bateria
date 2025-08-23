@@ -195,7 +195,7 @@ def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, floa
     axs[1].set_ylim(-max_demanda * 1.1, max_demanda * 1.1)
 
     # eje Y de demandas casa
-    axs[2].set_ylabel("Demanda Bateria (kWh)")
+    axs[2].set_ylabel("Demanda Batería (kWh)")
     axs[2].set_xticklabels(xticklabels, rotation=45)
     axs[2].set_xlabel('Hora' if fecha_inicio is None else 'Mes')
     for i in range(n_dias):
@@ -209,7 +209,9 @@ def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, floa
     axs[2].set_ylim(-max_demanda * 1.1, max_demanda * 1.1)
 
     # eje Y de demandas casa
-    axs[3].set_ylabel("Energia acumulada batería (kWh)")
+    #aux, mira si se quiere texto al final, eso dira si se quiere labels acortadas o no
+    texto_label = "Energía acum. batería (kWh)" if info_pie is not None else "Energía acumulada batería (kWh)"
+    axs[3].set_ylabel(texto_label)
     axs[3].set_xticklabels(xticklabels, rotation=45)
     axs[3].set_xlabel('Hora' if fecha_inicio is None else 'Mes')
     for i in range(n_dias):
@@ -229,10 +231,20 @@ def plot_multiples(vector_precio,vector_casa,vector_bateria,vector_energia, floa
     if mostrar_titulo: fig.suptitle(f"Precio Batería: {float_precio_unitario_tipo:.2f} €/kWh", fontsize=14, fontweight="bold") #titulo con su if
 
     if info_pie is not None:
-        texto_lineas = ["Comprobación de costes:", "---------------------------------------------"]
+        texto_lineas = ["Comprobación de costes:", "-----------------------------------------------------------------------------------------"]
+        """
         texto_lineas.append(f"Coste de electricidad sin bateria     : {float(info_pie['coste_casa']):.2f} €")
         texto_lineas.append(f"Coste de electricidad con bateria     : {float(info_pie['coste_casa_bat']):.2f} €")
-        texto_lineas.append(f"Ahorro                                : {info_pie['ahorro']:.2f} €")
+        texto_lineas.append(f"Ahorro                                : {info_pie['ahorro_sin']:.2f} €")
+        """
+        texto_lineas.append(
+            f"{'Coste sin batería: ':35} {float(info_pie['coste_casa']):.2f} €  |  "
+            f"{'Coste con batería: ':35} {float(info_pie['coste_casa_bat']):.2f} €"
+        )
+        texto_lineas.append(
+            f"{'Ahorro (sin contar inversion):  ':35} {info_pie['ahorro_sin']:.2f} €  |  "
+            f"{'Ahorro (contando inversion):    ':35} {info_pie['ahorro_con']:.2f} €"
+        )
 
         texto = "\n".join(texto_lineas)
 

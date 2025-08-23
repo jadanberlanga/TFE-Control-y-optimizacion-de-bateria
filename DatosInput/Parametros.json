@@ -27,7 +27,7 @@
     "altura_metros": 15,
     "zona_horaria": "Europe/Madrid",
     "eficiencia_porcentaje_decimal": 0.14,
-    "paneles_m2": 10,
+    "paneles_m2": 0,
     "potencia_max_w_m2": 250
   },
     "param_temperaturas": {
@@ -36,10 +36,10 @@
     "zona_horaria": "Europe/Madrid"
   },
     "opciones_calculo": {
-      "plot_intermedio": "100,200.5,300",
+      "plot_intermedio": "200,400",
       "json_generales": "resultados_generales_panel.json",
       "json_detalle": "resultados_detalle_panel.json",
-      "paso_general": 50,
+      "paso_general": 20,
       "paso_detalle": 5,
       "rango_inicio_general": 0,
       "rango_fin_general": 3,
@@ -52,6 +52,7 @@
     "modelo_precio": "DatosIA/modelo_precio_omie.pt"
   },
   "bateria_elegida": {
-    "capacidad_elegida_tot_kwh": 1
+    "capacidad_elegida_tot_kwh": 1.5,
+    "precio_final_bateria_eur": 300
   }
 }

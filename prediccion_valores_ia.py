@@ -1455,6 +1455,7 @@ def completar_datos(parametros_json, datos_emparejados, fuentes_emparejadas):
     else:
         device = "cpu"
 
+
     #si tengo los 3 modelos puedo usar la IA (ya sea en cpu o en gpu). Si falta alguno asumo que pueden estar comprometidos los otros, uso el modelo matematico directamente
     if tengo_modelos:
         #dentro de la funcion me genero una mascara y edito el df completandolo, y lo retorno con solo eso cambiado. Voy pasando el df de datos de funcion a funcion tipo ping pong completando en cada paso los datos que necesite
@@ -1482,7 +1483,7 @@ def completar_datos(parametros_json, datos_emparejados, fuentes_emparejadas):
 
     #ya que estamos guardo el archivo con lo generado, por tener con el resto
     carpeta = "DatosPython"
-    nombre_archivo = "datosEOST_prediccionIA_emparejados.csv"
+    nombre_archivo = "datosEOST_prediccionIA_emparejados_2.csv"
     ruta_output = os.path.join(carpeta, nombre_archivo)
     datos_emparejados.to_csv(ruta_output, index=False)
 

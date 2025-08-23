@@ -7,6 +7,8 @@ import calc_capacidad_bateria as calculo
 import presentar_datos as presentar
 import prediccion_valores_ia as moduloIA
 
+import auxiliar_datos_memoria as auxMemoria
+
 #import cupy as cp_gpu #para usar la grafica, con cuda 12 -> pip install cupy-cuda12x
 import pandas as pd
 import numpy as np
@@ -1285,6 +1287,9 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
     dic_tot,dic_mannana = subrutina_futuro_calc_optim(parametros, datos_combinados_IA, capacidad_bat=capacidad_usable)
     #print(dicc_fut)
 
+    #auxiliar para calcular datos de memoria
+    #auxMemoria.subrutina_futuro_calc_optim_mod(parametros, datos_combinados_IA, capacidad_bat=capacidad_usable)
+
 
 
     # === PRESENTACIÓN ===
@@ -1293,19 +1298,25 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
     demanda_bateria_mannana = dic_mannana["demanda_bateria"]
     demanda_casa_mannana = dic_mannana["demanda_casa"]
 
-    # Cálculo 1: coste asociado solo a la casa
+    # calculo 1: coste asociado solo a la casa
     coste_casa = (precio_mannana * demanda_casa_mannana).sum()
 
-    # Cálculo 2: coste conjunto (batería + casa) * precio_mannana
+    # calculo 2: coste conjunto (batería + casa) * precio_mannana
     coste_total = (precio_mannana * (demanda_bateria_mannana + demanda_casa_mannana)).sum()
+
+    # calculo 3: calcular inversion diaria para quitarsela al diario
+    precio_bat = parametros["bateria_elegida"]["precio_final_bateria_eur"]
+    target_year = parametros["param_usuario"]["target_years"]
+    inversion_diaria = precio_bat/(365*target_year)
 
     # Mostrar resultados
     print(f"""
        Comprobación de costes:
        --------------------------------
-       Coste casa sola : {coste_casa:.2f} eur
-       Coste casa+bat  : {coste_total:.2f} eur
-       Ahorro          : {coste_casa - coste_total:.2f} eur
+       Coste casa sola              : {coste_casa:.2f} eur
+       Coste casa+bat               : {coste_total:.2f} eur
+       Ahorro (sin contar inversion): {coste_casa - coste_total:.2f} eur
+       Ahorro (contando inversion)  : {coste_casa - coste_total - inversion_diaria:.2f} eur
        """)
 
     #voy a guadar la info. En txt, la cosa mas simple y legible posible, esto se mandara a algo con poca potencia de calculo
@@ -1336,7 +1347,7 @@ def modo_diario(parametros,plot=True, pausa_calc=True):
     #Y si quiero ver datos puedo plotearlos
     tiempo_fin_calculo = time.time() #antes de plotear que puede quedar ahi indefinido, considero el calculo acabado
     if plot:
-        dicc_costes = {"coste_casa": coste_casa,"coste_casa_bat": coste_total,"ahorro": coste_casa - coste_total} #aux para la funcion
+        dicc_costes = {"coste_casa": coste_casa,"coste_casa_bat": coste_total,"ahorro_sin": coste_casa - coste_total, "ahorro_con": coste_casa - coste_total - inversion_diaria} #aux para la funcion
         presentar.plot_multiples(dic_mannana["precio"], dic_mannana["demanda_casa"], dic_mannana["demanda_bateria"], dic_mannana["energia_bateria"], dic_mannana["precio_kwh_tipo"], fecha_inicio=None,formato_fecha="%d-%m-%y", parar_calc=False, mostrar_titulo=False,info_pie=dicc_costes)
         presentar.plot_multiples(dic_tot["precio"], dic_tot["demanda_casa"], dic_tot["demanda_bateria"], dic_tot["energia_bateria"], dic_tot["precio_kwh_tipo"], fecha_inicio=None, formato_fecha="%d-%m-%y", parar_calc=pausa_calc, mostrar_titulo=False)
 
