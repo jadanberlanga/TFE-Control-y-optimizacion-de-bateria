@@ -334,7 +334,7 @@ como, opcionalmente, la propia capacidad de la batería.
     #===== PROBLEMA DE OPTIMIZACION CON CVXPY =====
 
     # Ahora si empiezo el problema de optimizacion (usando cvxpy)
-    demanda_casa = datos["Demanda"].values  # Datos de consumo
+    demanda_casa = datos["Demanda"].values * multiplicador_demandas  # Datos de consumo
     precio = datos["Precio"].values  # Precio de la energía
     paneles = datos["PotenciaSolar"].values
     demanda_bateria = cp.Variable(horas)  # mi var a calcular, las 24h de la bateria.

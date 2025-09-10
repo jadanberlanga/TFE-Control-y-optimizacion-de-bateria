@@ -251,8 +251,8 @@ Es la funcion principal de este archivo.
         #idem para demanda, me viene en wh, usare mas kwh, /1000 tambien. Update ya no, los de edistribucion ya vienen en kwh
         #df_merged['Demanda'] = df_merged['Demanda'] / 1000
         #demadas ademas me defino un multiplicador para tener un margen de expansion. O simplemente para probar otras escalas de demandas
-        multiplicador_demandas = float(parametros_json["param_usuario"]["multiplicador"])
-        df_merged['Demanda'] = df_merged['Demanda'] * multiplicador_demandas
+        #multiplicador_demandas = float(parametros_json["param_usuario"]["multiplicador"])
+        #df_merged['Demanda'] = df_merged['Demanda'] * multiplicador_demandas
 
         #tambien calculo la potencia que obtienen los paneles de esa irradancia solar
         df_merged["Irradiancia"] = solar.calculo_paneles(parametros_json, df_merged["Irradiancia"])
